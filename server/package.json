@@ -1,0 +1,36 @@
+{
+  "name": "hrguru-hrms-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/app.js",
+    "start": "node src/app.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.js",
+    "check": "node --check src/app.js && node --check src/modules/auth/auth.routes.js && node --check src/modules/communication/communication.routes.js && node --check src/modules/dashboard/dashboard.routes.js && node --check src/modules/performance/performance.routes.js && node --check src/modules/saturday-rota/saturday-rota.routes.js && node --check src/lib/mailer.js && node --check src/jobs/attendance-noncompliance-report.js && node --check src/jobs/rotate-team-passwords.js && node --check src/jobs/send-onboarding-emails.js",
+    "attendance:noncompliance": "node src/jobs/attendance-noncompliance-report.js",
+    "team:rotate-passwords": "node src/jobs/rotate-team-passwords.js",
+    "team:onboarding-emails": "node src/jobs/send-onboarding-emails.js"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "google-auth-library": "^10.6.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^8.0.8",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0",
+    "tsx": "^4.19.2"
+  }
+}

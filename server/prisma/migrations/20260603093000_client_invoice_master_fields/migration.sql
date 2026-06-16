@@ -1,0 +1,8 @@
+ALTER TABLE "Client" ADD COLUMN "billingAddress" TEXT;
+ALTER TABLE "Client" ADD COLUMN "gstin" TEXT;
+ALTER TABLE "Client" ADD COLUMN "pan" TEXT;
+ALTER TABLE "Client" ADD COLUMN "state" TEXT;
+ALTER TABLE "Client" ADD COLUMN "stateCode" TEXT;
+ALTER TABLE "Client" ADD COLUMN "buyerPo" TEXT;
+ALTER TABLE "Client" ADD COLUMN "hsnSac" TEXT;
+ALTER TABLE "Client" ADD COLUMN "spoc" TEXT;

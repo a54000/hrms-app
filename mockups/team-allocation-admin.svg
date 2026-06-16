@@ -1,0 +1,124 @@
+<svg width="1440" height="920" viewBox="0 0 1440 920" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="920" fill="#0f172a"/>
+  <rect x="0" y="0" width="1440" height="920" fill="#111827"/>
+  <rect x="32" y="28" width="1376" height="864" rx="18" fill="#151c2e" stroke="#2a3448"/>
+
+  <rect x="64" y="56" width="92" height="40" rx="10" fill="#f2643b"/>
+  <text x="86" y="82" font-family="Inter, Segoe UI, Arial" font-size="18" font-weight="800" fill="#ffffff">HG</text>
+  <text x="176" y="78" font-family="Inter, Segoe UI, Arial" font-size="22" font-weight="800" fill="#f8fafc">HR Guru</text>
+  <text x="176" y="100" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#9fb0ca">Human Resource Management</text>
+
+  <rect x="1140" y="58" width="160" height="42" rx="10" fill="#1f2937" stroke="#334155"/>
+  <text x="1178" y="84" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="700" fill="#e5edf8">Export CSV</text>
+  <rect x="1312" y="58" width="56" height="42" rx="10" fill="#223047" stroke="#334155"/>
+  <circle cx="1340" cy="79" r="13" fill="#f2643b"/>
+  <text x="1332" y="84" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800" fill="#ffffff">SS</text>
+
+  <text x="64" y="158" font-family="Inter, Segoe UI, Arial" font-size="38" font-weight="850" fill="#f8fafc">Team Allocation</text>
+  <text x="64" y="186" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#9fb0ca">Client-wise view of recruiters, current assignment, and allocation start date.</text>
+
+  <g>
+    <rect x="64" y="226" width="304" height="112" rx="14" fill="#1f2937" stroke="#334155"/>
+    <text x="88" y="264" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="700" fill="#9fb0ca">Active team members</text>
+    <text x="88" y="306" font-family="Inter, Segoe UI, Arial" font-size="42" font-weight="850" fill="#f8fafc">39</text>
+    <text x="154" y="303" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#34d399">+1 restored</text>
+  </g>
+  <g>
+    <rect x="392" y="226" width="304" height="112" rx="14" fill="#1f2937" stroke="#334155"/>
+    <text x="416" y="264" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="700" fill="#9fb0ca">Clients covered</text>
+    <text x="416" y="306" font-family="Inter, Segoe UI, Arial" font-size="42" font-weight="850" fill="#f8fafc">11</text>
+    <text x="482" y="303" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#9fb0ca">active accounts</text>
+  </g>
+  <g>
+    <rect x="720" y="226" width="304" height="112" rx="14" fill="#1f2937" stroke="#334155"/>
+    <text x="744" y="264" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="700" fill="#9fb0ca">Unassigned</text>
+    <text x="744" y="306" font-family="Inter, Segoe UI, Arial" font-size="42" font-weight="850" fill="#f8fafc">2</text>
+    <text x="806" y="303" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#f59e0b">needs mapping</text>
+  </g>
+  <g>
+    <rect x="1048" y="226" width="320" height="112" rx="14" fill="#1f2937" stroke="#334155"/>
+    <text x="1072" y="264" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="700" fill="#9fb0ca">New this month</text>
+    <text x="1072" y="306" font-family="Inter, Segoe UI, Arial" font-size="42" font-weight="850" fill="#f8fafc">7</text>
+    <text x="1136" y="303" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#9fb0ca">client starts</text>
+  </g>
+
+  <rect x="64" y="370" width="312" height="486" rx="16" fill="#111827" stroke="#2a3448"/>
+  <text x="88" y="408" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#f8fafc">Clients</text>
+  <rect x="88" y="432" width="248" height="42" rx="10" fill="#1f2937" stroke="#334155"/>
+  <text x="108" y="458" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#9fb0ca">Search client or employee</text>
+
+  <g font-family="Inter, Segoe UI, Arial" font-size="14">
+    <rect x="88" y="498" width="248" height="46" rx="10" fill="#f2643b"/>
+    <text x="110" y="527" font-weight="800" fill="#ffffff">M&amp;M</text>
+    <text x="302" y="527" font-weight="800" fill="#ffffff" text-anchor="end">14</text>
+    <rect x="88" y="556" width="248" height="44" rx="10" fill="#182235"/>
+    <text x="110" y="584" fill="#e5edf8">Birla Opus</text>
+    <text x="302" y="584" fill="#9fb0ca" text-anchor="end">3</text>
+    <rect x="88" y="610" width="248" height="44" rx="10" fill="#182235"/>
+    <text x="110" y="638" fill="#e5edf8">HPE</text>
+    <text x="302" y="638" fill="#9fb0ca" text-anchor="end">3</text>
+    <rect x="88" y="664" width="248" height="44" rx="10" fill="#182235"/>
+    <text x="110" y="692" fill="#e5edf8">Saint Gobain</text>
+    <text x="302" y="692" fill="#9fb0ca" text-anchor="end">6</text>
+    <rect x="88" y="718" width="248" height="44" rx="10" fill="#182235"/>
+    <text x="110" y="746" fill="#e5edf8">Siemens</text>
+    <text x="302" y="746" fill="#9fb0ca" text-anchor="end">4</text>
+    <rect x="88" y="772" width="248" height="44" rx="10" fill="#182235"/>
+    <text x="110" y="800" fill="#e5edf8">Unassigned</text>
+    <text x="302" y="800" fill="#f59e0b" text-anchor="end">2</text>
+  </g>
+
+  <rect x="400" y="370" width="968" height="486" rx="16" fill="#111827" stroke="#2a3448"/>
+  <text x="432" y="410" font-family="Inter, Segoe UI, Arial" font-size="26" font-weight="850" fill="#f8fafc">M&amp;M Team</text>
+  <text x="432" y="436" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#9fb0ca">14 active recruiters · 3 new allocations this month · Manager view ready</text>
+
+  <rect x="1060" y="394" width="146" height="40" rx="10" fill="#1f2937" stroke="#334155"/>
+  <text x="1090" y="419" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#e5edf8">Active only</text>
+  <rect x="1220" y="394" width="116" height="40" rx="10" fill="#1f2937" stroke="#334155"/>
+  <text x="1248" y="419" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#e5edf8">June 2026</text>
+
+  <rect x="432" y="466" width="920" height="48" rx="10" fill="#182235"/>
+  <text x="460" y="496" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800" fill="#9fb0ca">EMPLOYEE</text>
+  <text x="732" y="496" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800" fill="#9fb0ca">ROLE</text>
+  <text x="1000" y="496" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800" fill="#9fb0ca">START DATE</text>
+  <text x="1210" y="496" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800" fill="#9fb0ca">STATUS</text>
+
+  <g font-family="Inter, Segoe UI, Arial">
+    <g>
+      <rect x="432" y="526" width="920" height="70" rx="12" fill="#151c2e" stroke="#2a3448"/>
+      <circle cx="468" cy="561" r="22" fill="#263449"/><text x="455" y="567" font-size="13" font-weight="800" fill="#f8fafc">AG</text>
+      <text x="500" y="554" font-size="15" font-weight="800" fill="#f8fafc">Aniket Gurjar</text>
+      <text x="500" y="576" font-size="12" fill="#9fb0ca">HRGP30 · M&amp;M</text>
+      <text x="732" y="566" font-size="14" fill="#e5edf8">Recruitment Consultant</text>
+      <text x="1000" y="566" font-size="14" fill="#e5edf8">01 Jun 2026</text>
+      <rect x="1210" y="544" width="86" height="28" rx="14" fill="#123524"/><text x="1231" y="563" font-size="12" font-weight="800" fill="#34d399">Active</text>
+    </g>
+    <g>
+      <rect x="432" y="608" width="920" height="70" rx="12" fill="#151c2e" stroke="#2a3448"/>
+      <circle cx="468" cy="643" r="22" fill="#263449"/><text x="456" y="649" font-size="13" font-weight="800" fill="#f8fafc">PT</text>
+      <text x="500" y="636" font-size="15" font-weight="800" fill="#f8fafc">Payal Thakur</text>
+      <text x="500" y="658" font-size="12" fill="#9fb0ca">HRGP38 · M&amp;M</text>
+      <text x="732" y="648" font-size="14" fill="#e5edf8">Recruitment Consultant</text>
+      <text x="1000" y="648" font-size="14" fill="#e5edf8">15 May 2026</text>
+      <rect x="1210" y="626" width="86" height="28" rx="14" fill="#123524"/><text x="1231" y="645" font-size="12" font-weight="800" fill="#34d399">Active</text>
+    </g>
+    <g>
+      <rect x="432" y="690" width="920" height="70" rx="12" fill="#151c2e" stroke="#2a3448"/>
+      <circle cx="468" cy="725" r="22" fill="#263449"/><text x="456" y="731" font-size="13" font-weight="800" fill="#f8fafc">VK</text>
+      <text x="500" y="718" font-size="15" font-weight="800" fill="#f8fafc">Vidhi Kapoor</text>
+      <text x="500" y="740" font-size="12" fill="#9fb0ca">HRGP36 · M&amp;M</text>
+      <text x="732" y="730" font-size="14" fill="#e5edf8">Recruitment Consultant</text>
+      <text x="1000" y="730" font-size="14" fill="#e5edf8">01 Jun 2026</text>
+      <rect x="1210" y="708" width="86" height="28" rx="14" fill="#123524"/><text x="1231" y="727" font-size="12" font-weight="800" fill="#34d399">Active</text>
+    </g>
+    <g>
+      <rect x="432" y="772" width="920" height="70" rx="12" fill="#151c2e" stroke="#2a3448"/>
+      <circle cx="468" cy="807" r="22" fill="#263449"/><text x="455" y="813" font-size="13" font-weight="800" fill="#f8fafc">NS</text>
+      <text x="500" y="800" font-size="15" font-weight="800" fill="#f8fafc">Nandhini</text>
+      <text x="500" y="822" font-size="12" fill="#9fb0ca">HRGP57 · M&amp;M</text>
+      <text x="732" y="812" font-size="14" fill="#e5edf8">Recruitment Consultant</text>
+      <text x="1000" y="812" font-size="14" fill="#e5edf8">01 Jun 2026</text>
+      <rect x="1210" y="790" width="86" height="28" rx="14" fill="#123524"/><text x="1231" y="809" font-size="12" font-weight="800" fill="#34d399">Active</text>
+    </g>
+  </g>
+</svg>

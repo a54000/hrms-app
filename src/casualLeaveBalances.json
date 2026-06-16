@@ -1,0 +1,580 @@
+{
+  "importedAt": "2026-05-30T06:45:45.160Z",
+  "balanceCutoffDate": "2026-05-29",
+  "source": "C:/Users/Surinder/Downloads/HR Guru Placement Services - Leaves.csv",
+  "balances": {
+    "HRGP09": {
+      "balance": -1,
+      "total": 3,
+      "sourceEmail": "akansh@hrguru.co.in",
+      "sourceName": "Akansh"
+    },
+    "HRGP30": {
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "aniket.hrgp@gmail.com",
+      "sourceName": "Aniket"
+    },
+    "HRGP59": {
+      "balance": 3,
+      "total": 5,
+      "sourceEmail": "ankita.hrgp01@gmail.com",
+      "sourceName": "Ankita Burman"
+    },
+    "HRGP77": {
+      "balance": 0.5,
+      "total": 2,
+      "sourceEmail": "ankitathakur.hrgp@gmail.com",
+      "sourceName": "Ankita Thakur"
+    },
+    "HRGP39": {
+      "balance": 0,
+      "total": 3,
+      "sourceEmail": "anshul.hrgp@gmail.com",
+      "sourceName": "Anshul Saran"
+    },
+    "HRGP70": {
+      "balance": 1,
+      "total": 4,
+      "sourceEmail": "deepak.hrgp@gmail.com",
+      "sourceName": "Deepak Jena"
+    },
+    "HRGP48": {
+      "balance": 3.5,
+      "total": 4,
+      "sourceEmail": "deepti.hrgp@gmail.com",
+      "sourceName": "Deepti Beedi"
+    },
+    "HRGP87": {
+      "balance": 0,
+      "total": 0,
+      "sourceEmail": "divya.hrgp@gmail.com",
+      "sourceName": "Divya S"
+    },
+    "HRGP46": {
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "harshita.hrgp@gmail.com",
+      "sourceName": "Harshita"
+    },
+    "HRGP56": {
+      "balance": 0,
+      "total": 5,
+      "sourceEmail": "harshita.arora.hrgp@gmail.com",
+      "sourceName": "Harshita Arora"
+    },
+    "HRGP73": {
+      "balance": 2,
+      "total": 2,
+      "sourceEmail": "hemlata.hrgp@gmail.com",
+      "sourceName": "Hemlata Bisht"
+    },
+    "HRGP83": {
+      "balance": 1,
+      "total": 1,
+      "sourceEmail": "ikram.hrgp@outlook.com",
+      "sourceName": "Ikram Khan"
+    },
+    "HRGP89": {
+      "balance": 0,
+      "total": 0,
+      "sourceEmail": "janvi.hrgp@gmail.com",
+      "sourceName": "Janvi"
+    },
+    "HRGP07": {
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "megha@hrguru.co.in",
+      "sourceName": "Megha Singh"
+    },
+    "HRGP57": {
+      "balance": 2,
+      "total": 3,
+      "sourceEmail": "nandhini.hrgp@gmail.com",
+      "sourceName": "Nandhini"
+    },
+    "HRGP33": {
+      "balance": 4.5,
+      "total": 4.5,
+      "sourceEmail": "pallavi.hrgp@gmail.com",
+      "sourceName": "Pallavi"
+    },
+    "HRGP34": {
+      "balance": 2,
+      "total": 4,
+      "sourceEmail": "pankhuri.hrgp@gmail.com",
+      "sourceName": "Pankhuri"
+    },
+    "HRGP58": {
+      "balance": 2.5,
+      "total": 2.5,
+      "sourceEmail": "parul.hrgp@gmail.com",
+      "sourceName": "Parul"
+    },
+    "HRGP38": {
+      "balance": 5,
+      "total": 5,
+      "sourceEmail": "payal.hrgp@gmail.com",
+      "sourceName": "Payal Thakur"
+    },
+    "HRGP85": {
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "pooja.chouhan.hrgp@outlook.com",
+      "sourceName": "Pooja Chouhan"
+    },
+    "HRGP66": {
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "pooja.hrgp@gmail.com",
+      "sourceName": "Pooja Vishwakarma"
+    },
+    "HRGP62": {
+      "balance": 2,
+      "total": 4,
+      "sourceEmail": "poonam.hrgp@gmail.com",
+      "sourceName": "Poonam Sharma"
+    },
+    "HRGP47": {
+      "balance": 1,
+      "total": 3,
+      "sourceEmail": "princy.hrgp@gmail.com",
+      "sourceName": "Princy"
+    },
+    "HRGP82": {
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "priyanka.kadam.hrgp@gmail.com",
+      "sourceName": "Priyanka Kadam"
+    },
+    "HRGP68": {
+      "balance": 5,
+      "total": 5,
+      "sourceEmail": "priyanka.hrgp@outlook.com",
+      "sourceName": "Priyanka Salgare"
+    },
+    "HRGP90": {
+      "balance": 0,
+      "total": 0,
+      "sourceEmail": "priya.hrgp@gmail.com",
+      "sourceName": "Priya Sonkar"
+    },
+    "HRGP54": {
+      "balance": 2,
+      "total": 2,
+      "sourceEmail": "radhika.hrgp@gmail.com",
+      "sourceName": "Radhika Kela"
+    },
+    "HRGP03": {
+      "balance": 0,
+      "total": 1,
+      "sourceEmail": "reetu@hrguru.co.in",
+      "sourceName": "Reetu Saini"
+    },
+    "HRGP81": {
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "sapna.hrgp@gmail.com",
+      "sourceName": "Sapna"
+    },
+    "HRGP78": {
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "sushant.hrgp@gmail.com",
+      "sourceName": "Shushant"
+    },
+    "HG-9000": {
+      "balance": 5,
+      "total": 5,
+      "sourceEmail": "surinder.hrgp@gmail.com",
+      "sourceName": "Surinder Singh"
+    },
+    "HRGP72": {
+      "balance": 2,
+      "total": 3,
+      "sourceEmail": "tadreesa.hrgp@gmail.com",
+      "sourceName": "Tadreesa"
+    },
+    "HRGP35": {
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "tanu.hrgp@gmail.com",
+      "sourceName": "Tanu Rajput"
+    },
+    "HRGP51": {
+      "balance": -1,
+      "total": 2,
+      "sourceEmail": "vaishnavi.hrgp@gmail.com",
+      "sourceName": "Vaishnavi"
+    },
+    "HRGP36": {
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "vidhi.hrgp@gmail.com",
+      "sourceName": "Vidhi Kapoor"
+    },
+    "HRGP84": {
+      "balance": 1,
+      "total": 1,
+      "sourceEmail": "vipul.hrgp@gmail.com",
+      "sourceName": "Vipul Sharma"
+    },
+    "HRGP50": {
+      "balance": 3,
+      "total": 5,
+      "sourceEmail": "yashi.hrgp@gmail.com",
+      "sourceName": "Yashi Sharma"
+    },
+    "HRGP71": {
+      "balance": -2,
+      "total": 1,
+      "sourceEmail": "yogesh.hrgp@gmail.com",
+      "sourceName": "Yogesh"
+    }
+  },
+  "rows": [
+    {
+      "employeeCode": "HRGP09",
+      "employeeName": "Akansh Pal",
+      "employeeEmail": "akansh.hrgp@gmail.com",
+      "balance": 2,
+      "total": 3,
+      "sourceEmail": "akansh@hrguru.co.in",
+      "sourceName": "Akansh"
+    },
+    {
+      "employeeCode": "HRGP30",
+      "employeeName": "Aniket",
+      "employeeEmail": "aniket.hrgp@gmail.com",
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "aniket.hrgp@gmail.com",
+      "sourceName": "Aniket"
+    },
+    {
+      "employeeCode": "HRGP59",
+      "employeeName": "Ankita",
+      "employeeEmail": "ankita.hrgp01@gmail.com",
+      "balance": 3,
+      "total": 5,
+      "sourceEmail": "ankita.hrgp01@gmail.com",
+      "sourceName": "Ankita Burman"
+    },
+    {
+      "employeeCode": "HRGP77",
+      "employeeName": "Ankita Thakur",
+      "employeeEmail": "ankitathakur.hrgp@gmail.com",
+      "balance": 0.5,
+      "total": 2,
+      "sourceEmail": "ankitathakur.hrgp@gmail.com",
+      "sourceName": "Ankita Thakur"
+    },
+    {
+      "employeeCode": "HRGP39",
+      "employeeName": "Anshul Saran",
+      "employeeEmail": "anshul.hrgp@gmail.com",
+      "balance": 0,
+      "total": 3,
+      "sourceEmail": "anshul.hrgp@gmail.com",
+      "sourceName": "Anshul Saran"
+    },
+    {
+      "employeeCode": "HRGP70",
+      "employeeName": "Deepak Jena",
+      "employeeEmail": "deepak.hrgp@gmail.com",
+      "balance": 1,
+      "total": 4,
+      "sourceEmail": "deepak.hrgp@gmail.com",
+      "sourceName": "Deepak Jena"
+    },
+    {
+      "employeeCode": "HRGP48",
+      "employeeName": "Deepti Beedi",
+      "employeeEmail": "deepti.hrgp@gmail.com",
+      "balance": 3.5,
+      "total": 4,
+      "sourceEmail": "deepti.hrgp@gmail.com",
+      "sourceName": "Deepti Beedi"
+    },
+    {
+      "employeeCode": "HRGP87",
+      "employeeName": "Divya S",
+      "employeeEmail": "divya.hrgp@gmail.com",
+      "balance": 0,
+      "total": 0,
+      "sourceEmail": "divya.hrgp@gmail.com",
+      "sourceName": "Divya S"
+    },
+    {
+      "employeeCode": "HRGP56",
+      "employeeName": "Harshita Arora",
+      "employeeEmail": "harshita.arora.hrgp@gmail.com",
+      "balance": 0,
+      "total": 5,
+      "sourceEmail": "harshita.arora.hrgp@gmail.com",
+      "sourceName": "Harshita Arora"
+    },
+    {
+      "employeeCode": "HRGP46",
+      "employeeName": "Harshita Pruthi",
+      "employeeEmail": "harshita.hrgp@gmail.com",
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "harshita.hrgp@gmail.com",
+      "sourceName": "Harshita"
+    },
+    {
+      "employeeCode": "HRGP73",
+      "employeeName": "Hemlata",
+      "employeeEmail": "hemlata.hrgp@gmail.com",
+      "balance": 2,
+      "total": 2,
+      "sourceEmail": "hemlata.hrgp@gmail.com",
+      "sourceName": "Hemlata Bisht"
+    },
+    {
+      "employeeCode": "HRGP83",
+      "employeeName": "Ikram Khan",
+      "employeeEmail": "ikram.hrgp@gmail.com",
+      "balance": 1,
+      "total": 1,
+      "sourceEmail": "ikram.hrgp@outlook.com",
+      "sourceName": "Ikram Khan"
+    },
+    {
+      "employeeCode": "HRGP89",
+      "employeeName": "Janvi",
+      "employeeEmail": "janvi.hrgp@gmail.com",
+      "balance": 0,
+      "total": 0,
+      "sourceEmail": "janvi.hrgp@gmail.com",
+      "sourceName": "Janvi"
+    },
+    {
+      "employeeCode": "HRGP07",
+      "employeeName": "Megha Singh",
+      "employeeEmail": "megha.hrgp@gmail.com",
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "megha@hrguru.co.in",
+      "sourceName": "Megha Singh"
+    },
+    {
+      "employeeCode": "HRGP57",
+      "employeeName": "Nandhini",
+      "employeeEmail": "nandhini.hrgp@gmail.com",
+      "balance": 2,
+      "total": 3,
+      "sourceEmail": "nandhini.hrgp@gmail.com",
+      "sourceName": "Nandhini"
+    },
+    {
+      "employeeCode": "HRGP33",
+      "employeeName": "Pallavi",
+      "employeeEmail": "pallavi.hrgp@gmail.com",
+      "balance": 4.5,
+      "total": 4.5,
+      "sourceEmail": "pallavi.hrgp@gmail.com",
+      "sourceName": "Pallavi"
+    },
+    {
+      "employeeCode": "HRGP34",
+      "employeeName": "Pankhuri",
+      "employeeEmail": "pankhuri.hrgp@gmail.com",
+      "balance": 2,
+      "total": 4,
+      "sourceEmail": "pankhuri.hrgp@gmail.com",
+      "sourceName": "Pankhuri"
+    },
+    {
+      "employeeCode": "HRGP58",
+      "employeeName": "Parul Yadav",
+      "employeeEmail": "parul.hrgp@gmail.com",
+      "balance": 2.5,
+      "total": 2.5,
+      "sourceEmail": "parul.hrgp@gmail.com",
+      "sourceName": "Parul"
+    },
+    {
+      "employeeCode": "HRGP38",
+      "employeeName": "Payal Thakur",
+      "employeeEmail": "payal.hrgp@gmail.com",
+      "balance": 5,
+      "total": 5,
+      "sourceEmail": "payal.hrgp@gmail.com",
+      "sourceName": "Payal Thakur"
+    },
+    {
+      "employeeCode": "HRGP85",
+      "employeeName": "Pooja Chouhan",
+      "employeeEmail": "pooja.c.hrgp@gmail.com",
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "pooja.chouhan.hrgp@outlook.com",
+      "sourceName": "Pooja Chouhan"
+    },
+    {
+      "employeeCode": "HRGP66",
+      "employeeName": "Pooja Vishwakarma",
+      "employeeEmail": "pooja.v.hrgp@gmail.com",
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "pooja.hrgp@gmail.com",
+      "sourceName": "Pooja Vishwakarma"
+    },
+    {
+      "employeeCode": "HRGP62",
+      "employeeName": "Poonam Sharma",
+      "employeeEmail": "poonam.hrgp@gmail.com",
+      "balance": 2,
+      "total": 4,
+      "sourceEmail": "poonam.hrgp@gmail.com",
+      "sourceName": "Poonam Sharma"
+    },
+    {
+      "employeeCode": "HRGP47",
+      "employeeName": "Princy",
+      "employeeEmail": "princy.hrgp@gmail.com",
+      "balance": 1,
+      "total": 3,
+      "sourceEmail": "princy.hrgp@gmail.com",
+      "sourceName": "Princy"
+    },
+    {
+      "employeeCode": "HRGP90",
+      "employeeName": "Priya",
+      "employeeEmail": "priya.hrgp@gmail.com",
+      "balance": 0,
+      "total": 0,
+      "sourceEmail": "priya.hrgp@gmail.com",
+      "sourceName": "Priya Sonkar"
+    },
+    {
+      "employeeCode": "HRGP82",
+      "employeeName": "Priyanka Kadam",
+      "employeeEmail": "priyanka.kadam.hrgp@gmail.com",
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "priyanka.kadam.hrgp@gmail.com",
+      "sourceName": "Priyanka Kadam"
+    },
+    {
+      "employeeCode": "HRGP68",
+      "employeeName": "Priyanka Salgare",
+      "employeeEmail": "priyanka.n.hrgp@gmail.com",
+      "balance": 5,
+      "total": 5,
+      "sourceEmail": "priyanka.hrgp@outlook.com",
+      "sourceName": "Priyanka Salgare"
+    },
+    {
+      "employeeCode": "HRGP54",
+      "employeeName": "Radhika",
+      "employeeEmail": "radhika.hrgp@gmail.com",
+      "balance": 2,
+      "total": 2,
+      "sourceEmail": "radhika.hrgp@gmail.com",
+      "sourceName": "Radhika Kela"
+    },
+    {
+      "employeeCode": "HRGP03",
+      "employeeName": "Reetu Saini",
+      "employeeEmail": "reetu.hrgp@gmail.com",
+      "balance": 0,
+      "total": 1,
+      "sourceEmail": "reetu@hrguru.co.in",
+      "sourceName": "Reetu Saini"
+    },
+    {
+      "employeeCode": "HRGP81",
+      "employeeName": "Sapna",
+      "employeeEmail": "sapna.hrgp@gmail.com",
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "sapna.hrgp@gmail.com",
+      "sourceName": "Sapna"
+    },
+    {
+      "employeeCode": "HG-9000",
+      "employeeName": "Surinder Singh",
+      "employeeEmail": "surinder.singh@hrguru.in",
+      "balance": 5,
+      "total": 5,
+      "sourceEmail": "surinder.hrgp@gmail.com",
+      "sourceName": "Surinder Singh"
+    },
+    {
+      "employeeCode": "HRGP78",
+      "employeeName": "Sushant",
+      "employeeEmail": "sushant.hrgp@gmail.com",
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "sushant.hrgp@gmail.com",
+      "sourceName": "Shushant"
+    },
+    {
+      "employeeCode": "HRGP72",
+      "employeeName": "Tadreesa Khatoon",
+      "employeeEmail": "tadreesa.hrgp@gmail.com",
+      "balance": 2,
+      "total": 3,
+      "sourceEmail": "tadreesa.hrgp@gmail.com",
+      "sourceName": "Tadreesa"
+    },
+    {
+      "employeeCode": "HRGP35",
+      "employeeName": "Tanu Rajput",
+      "employeeEmail": "tanu.hrgp@gmail.com",
+      "balance": 1,
+      "total": 2,
+      "sourceEmail": "tanu.hrgp@gmail.com",
+      "sourceName": "Tanu Rajput"
+    },
+    {
+      "employeeCode": "HRGP51",
+      "employeeName": "Vaishnavi Sinha",
+      "employeeEmail": "vaishnavi.hrgp@gmail.com",
+      "balance": -1,
+      "total": 2,
+      "sourceEmail": "vaishnavi.hrgp@gmail.com",
+      "sourceName": "Vaishnavi"
+    },
+    {
+      "employeeCode": "HRGP36",
+      "employeeName": "Vidhi Kapoor",
+      "employeeEmail": "vidhi.hrgp@gmail.com",
+      "balance": 0,
+      "total": 2,
+      "sourceEmail": "vidhi.hrgp@gmail.com",
+      "sourceName": "Vidhi Kapoor"
+    },
+    {
+      "employeeCode": "HRGP84",
+      "employeeName": "Vipul Sharma",
+      "employeeEmail": "vipul.hrgp@gmail.com",
+      "balance": 1,
+      "total": 1,
+      "sourceEmail": "vipul.hrgp@gmail.com",
+      "sourceName": "Vipul Sharma"
+    },
+    {
+      "employeeCode": "HRGP50",
+      "employeeName": "Yashi Sharma",
+      "employeeEmail": "yashi.hrgp@gmail.com",
+      "balance": 3,
+      "total": 5,
+      "sourceEmail": "yashi.hrgp@gmail.com",
+      "sourceName": "Yashi Sharma"
+    },
+    {
+      "employeeCode": "HRGP71",
+      "employeeName": "Yogesh",
+      "employeeEmail": "yogesh.hrgp@gmail.com",
+      "balance": -2,
+      "total": 1,
+      "sourceEmail": "yogesh.hrgp@gmail.com",
+      "sourceName": "Yogesh"
+    }
+  ],
+  "unmatched": []
+}
