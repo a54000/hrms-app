@@ -1,6 +1,4 @@
-# HR Guru HRMS App
-
-HR Guru HRMS is a full-stack human resources management system for employee master data, attendance, leave, payroll support, client allocation, communication workflows, Saturday rota management, recruitment, performance tracking, reporting, and admin/security settings.
+# HRMS is a full-stack human resources management system for employee master data, attendance, leave, payroll support, client allocation, communication workflows, Saturday rota management, recruitment, performance tracking, reporting, and admin/security settings.
 
 The repository contains:
 
