@@ -425,6 +425,7 @@ model RecruitmentCandidate {
   location            String?
   expectedCtc         String?
   stage               CandidateStage  @default(screening)
+  ownerName           String?
   ownerId             String?         @db.Uuid
   owner               User?           @relation("CandidateOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   convertedEmployeeId String?         @db.Uuid

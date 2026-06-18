@@ -1697,6 +1697,47 @@ function App() {
   }, [candidateRecords]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!sessionUser) return;
+
+    async function loadRecruitmentCandidates() {
+      const localCandidates = loadStoredCandidates();
+      const response = await fetch(`${API_BASE_URL}/api/recruitment/candidates`, {
+        credentials: "include",
+        headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message || "Unable to load recruitment candidates.");
+
+      let databaseCandidates = data.candidates || [];
+      const databaseIds = new Set(databaseCandidates.map((candidate) => candidate.id));
+      const localOnlyCandidates = localCandidates.filter((candidate) => candidate.id && !databaseIds.has(candidate.id));
+
+      if (localOnlyCandidates.length) {
+        const savedCandidates = await Promise.all(localOnlyCandidates.map(async (candidate) => {
+          const saveResponse = await fetch(`${API_BASE_URL}/api/recruitment/candidates`, {
+            method: "POST",
+            credentials: "include",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify(candidate),
+          });
+          const saveData = await saveResponse.json().catch(() => ({}));
+          if (!saveResponse.ok) throw new Error(saveData.error?.message || "Unable to save local recruitment candidate.");
+          return saveData.candidate;
+        }));
+        databaseCandidates = [...savedCandidates, ...databaseCandidates];
+      }
+
+      if (!cancelled) setCandidateRecords(databaseCandidates);
+    }
+
+    loadRecruitmentCandidates().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUser]);
+
+  useEffect(() => {
     window.localStorage.setItem(CLIENT_STORAGE_KEY, JSON.stringify(clientRecords));
   }, [clientRecords]);
 
@@ -7625,17 +7666,46 @@ function Recruitment({ candidates, setCandidates, employees, setEmployees }) {
     setDraft({ ...emptyCandidate, id: `CAN-${Date.now()}`, appliedOn: new Date().toISOString().slice(0, 10) });
   }
 
-  function saveCandidate(candidate) {
+  async function saveCandidate(candidate) {
     if (!candidate.candidate.trim() || !candidate.role.trim()) return;
-    setCandidates((current) => {
-      const exists = current.some((item) => item.id === candidate.id);
-      return exists ? current.map((item) => item.id === candidate.id ? candidate : item) : [candidate, ...current];
-    });
-    setDraft(null);
+    try {
+      const exists = candidates.some((item) => item.id === candidate.id);
+      const response = await fetch(`${API_BASE_URL}/api/recruitment/candidates${exists ? `/${candidate.id}` : ""}`, {
+        method: exists ? "PATCH" : "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(candidate),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message || "Unable to save candidate.");
+      const savedCandidate = data.candidate || candidate;
+      setCandidates((current) => {
+        const hasCandidate = current.some((item) => item.id === savedCandidate.id);
+        return hasCandidate ? current.map((item) => item.id === savedCandidate.id ? savedCandidate : item) : [savedCandidate, ...current];
+      });
+      setDraft(null);
+    } catch (error) {
+      window.alert(error.message || "Unable to save candidate.");
+    }
   }
 
-  function updateStage(id, stage) {
+  async function updateStage(id, stage) {
+    const previousCandidates = candidates;
     setCandidates((current) => current.map((candidate) => candidate.id === id ? { ...candidate, stage } : candidate));
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/recruitment/candidates/${id}/stage`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ stage }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message || "Unable to update candidate stage.");
+      if (data.candidate) setCandidates((current) => current.map((candidate) => candidate.id === id ? data.candidate : candidate));
+    } catch (error) {
+      setCandidates(previousCandidates);
+      window.alert(error.message || "Unable to update candidate stage.");
+    }
   }
 
   function startConversion(candidate) {
