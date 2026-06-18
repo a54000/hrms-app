@@ -1726,6 +1726,8 @@ function App() {
           return saveData.candidate;
         }));
         databaseCandidates = [...savedCandidates, ...databaseCandidates];
+        window.localStorage.setItem(`${RECRUITMENT_STORAGE_KEY}_migrated_at`, new Date().toISOString());
+        window.alert(`${savedCandidates.length} recruitment candidate${savedCandidates.length === 1 ? "" : "s"} saved to the database.`);
       }
 
       if (!cancelled) setCandidateRecords(databaseCandidates);
