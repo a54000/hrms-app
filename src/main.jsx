@@ -2132,6 +2132,7 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
   const [dismissed, setDismissed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [missedCheckInTime, setMissedCheckInTime] = useState("09:30");
   const todayRecord = attendanceRecords.find((record) => record.employeeId === employee.employeeId && record.date === today);
   const isAttendanceExempt = employee.name === "Surinder Singh";
   const previousOpenRecord = attendanceRecords
@@ -2145,6 +2146,7 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
   const afterLoginWindow = currentMinutes >= timeMinutes("20:00");
   const outsideLoginWindow = beforeLoginWindow || afterLoginWindow;
   const afterCutoff = !isAttendanceExempt && currentMinutes > timeMinutes("10:30");
+  const lateMissedCheckIn = !isAttendanceExempt && currentMinutes >= timeMinutes("18:00");
   const duplicateCheckInRequest = attendanceRequests.some((request) => (
     request.employeeId === employee.employeeId &&
     request.date === today &&
@@ -2194,10 +2196,10 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
       requestType: "Forgot to punch",
       statusValue: "Present",
       punchType: "Check in",
-      checkIn: currentLocalTime(),
+      checkIn: lateMissedCheckIn ? missedCheckInTime : currentLocalTime(),
       checkOut: "",
       hours: "",
-      reason: "Check in",
+      reason: lateMissedCheckIn ? "Forgot to punch" : "Check in",
       status: "Approved",
       createdAt: today,
     };
@@ -2274,8 +2276,10 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
                 ? beforeLoginWindow
                   ? "Check-in is available after 8:30 AM."
                   : "Check-in is not available after 8:00 PM."
-                : afterCutoff
-                  ? "It is past 10:30 AM, so direct check-in is closed. Now you have to raise a punch request."
+                  : lateMissedCheckIn
+                    ? "This looks like a missed morning check-in. Please confirm your actual start time and raise a Forgot to punch request."
+                  : afterCutoff
+                    ? "It is past 10:30 AM, so direct check-in is closed. Raise a punch request with the correct check-in time."
                   : "Please check in before continuing with HRMS."}
             </p>
           </div>
@@ -2289,8 +2293,10 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
                 ? `Why: checkout is missing for ${previousOpenDate}. Check-in was recorded at ${previousOpenRecord?.checkIn || "the saved time"}.`
                 : outsideLoginWindow
                 ? "Please contact Admin if you need attendance support outside login hours."
-                : afterCutoff
-                  ? "Raise a Forgot to punch request to continue."
+                  : lateMissedCheckIn
+                    ? "Use the time you actually started work, not the current late-evening login time."
+                  : afterCutoff
+                    ? "Raise a Forgot to punch request to continue."
                   : "Your check-in will be recorded for today."}
             </span>
           </div>
@@ -2299,6 +2305,12 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
               <AlertCircle size={17} />
               <span>What next: click Raise checkout request, confirm the correct checkout time for {previousOpenDate}, and submit it. Once the request is saved, today&apos;s check-in will be available.</span>
             </div>
+          )}
+          {!previousCheckoutMissing && !outsideLoginWindow && afterCutoff && (
+            <label className="field">
+              <span>Actual check-in time</span>
+              <input type="time" value={lateMissedCheckIn ? missedCheckInTime : currentLocalTime()} disabled={!lateMissedCheckIn} onInput={(event) => setMissedCheckInTime(event.target.value)} onChange={(event) => setMissedCheckInTime(event.target.value)} />
+            </label>
           )}
         </div>
         {error && <div className="form-error">{error}</div>}
@@ -5596,6 +5608,8 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
     const isPreviousCheckoutFix = previousCheckoutMissing && sourceRecord.date === previousOpenDate;
     const hasCheckIn = Boolean(sourceRecord.checkIn);
     const punchType = isPreviousCheckoutFix || (type === "Forgot to punch" && hasCheckIn) ? "Checkout" : "Check in";
+    const lateMissedCheckIn = punchType === "Check in" && minutesSinceMidnight(currentTimeValue()) >= minutesSinceMidnight("18:00");
+    const defaultCheckInTime = lateMissedCheckIn ? "09:30" : currentTimeValue();
     if (type === "Forgot to punch" && existingPunchRequest(ownEmployee.employeeId, date, punchType)) {
       setDuplicateRequestNotice(duplicatePunchMessage(punchType, date));
       return;
@@ -5607,10 +5621,10 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       requestType: type,
       punchType,
       statusValue: isSecondHalf ? "Half Day" : (sourceRecord.status || "Present"),
-      checkIn: punchType === "Check in" ? (sourceRecord.checkIn || (isSecondHalf ? "14:00" : currentTimeValue())) : (sourceRecord.checkIn || ""),
+      checkIn: punchType === "Check in" ? (sourceRecord.checkIn || (isSecondHalf ? "14:00" : defaultCheckInTime)) : (sourceRecord.checkIn || ""),
       checkOut: punchType === "Checkout" ? (sourceRecord.checkOut || (isPreviousCheckoutFix ? "18:30" : currentTimeValue())) : (sourceRecord.checkOut || ""),
       hours: sourceRecord.hours || (isSecondHalf ? "" : ""),
-      reason: isSecondHalf ? "" : punchType === "Check in" ? "Running late" : "Checkout",
+      reason: isSecondHalf ? "" : punchType === "Check in" ? (lateMissedCheckIn ? "Forgot to punch" : "Running late") : "Checkout",
       screenshotName: "",
       screenshotData: "",
       screenshotMimeType: "",
