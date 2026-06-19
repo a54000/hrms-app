@@ -37,6 +37,14 @@ const userResetSchema = z.object({
   mustChangePassword: z.boolean().default(true),
 });
 
+const attendanceRequestLimitResetSchema = z.object({
+  employeeLookup: z.string().min(1),
+  month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  justification: z.string().optional().nullable(),
+});
+
+const IST_OFFSET_MINUTES = 330;
+
 function randomPassword() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   const symbols = "@#$%";
@@ -48,6 +56,17 @@ function randomPassword() {
   ];
   const rest = Array.from({ length: 8 }, () => (alphabet + symbols)[crypto.randomInt(0, alphabet.length + symbols.length)]);
   return [...required, ...rest].sort(() => crypto.randomInt(0, 3) - 1).join("");
+}
+
+function currentIstMonth() {
+  return new Date(Date.now() + IST_OFFSET_MINUTES * 60 * 1000).toISOString().slice(0, 7);
+}
+
+function monthRange(month) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const start = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const end = new Date(Date.UTC(year, monthNumber, 0));
+  return { start, end };
 }
 
 function usernameFromEmployee(employee) {
@@ -113,6 +132,24 @@ async function findEmployeeForLogin(value) {
   });
   if (!employee) throw httpError(404, "Employee record not found. Use employee code, employee email, or name from Employee Master.");
   return employee;
+}
+
+async function attendanceRequestCount(employeeId, month) {
+  const { start, end } = monthRange(month);
+  const latestReset = await prisma.attendanceLimitResetRequest.findFirst({
+    where: { employeeId, month, status: "approved" },
+    orderBy: { approvedAt: "desc" },
+    select: { approvedAt: true, createdAt: true },
+  });
+  const resetAt = latestReset?.approvedAt || latestReset?.createdAt || null;
+  return prisma.attendanceUpdateRequest.count({
+    where: {
+      employeeId,
+      attendanceDate: { gte: start, lte: end },
+      requestType: { not: "Working from 2nd Half" },
+      ...(resetAt ? { createdAt: { gt: resetAt } } : {}),
+    },
+  });
 }
 
 router.use(requireAuth);
@@ -255,6 +292,45 @@ router.delete("/users/:id", async (request, response, next) => {
   } catch (error) {
     if (error.code === "P2025") next(httpError(404, "Login user not found."));
     else next(error);
+  }
+});
+
+router.post("/attendance-request-limit-resets", async (request, response, next) => {
+  try {
+    const parsed = attendanceRequestLimitResetSchema.safeParse(request.body);
+    if (!parsed.success) throw httpError(400, "Employee and month are required.");
+    const employee = await findEmployeeForLogin(parsed.data.employeeLookup);
+    const month = parsed.data.month || currentIstMonth();
+    const requestCount = await attendanceRequestCount(employee.id, month);
+    const resetRequest = await prisma.attendanceLimitResetRequest.create({
+      data: {
+        employeeId: employee.id,
+        month,
+        requestCount,
+        justification: parsed.data.justification?.trim() || `Admin reset from Settings for ${employee.fullName}`,
+        status: "approved",
+        approverId: request.user.id,
+        approvedAt: new Date(),
+      },
+      include: {
+        employee: { select: { employeeCode: true, fullName: true, email: true } },
+      },
+    });
+    response.status(201).json({
+      ok: true,
+      reset: {
+        id: resetRequest.id,
+        employeeCode: resetRequest.employee.employeeCode,
+        employee: resetRequest.employee.fullName,
+        email: resetRequest.employee.email,
+        month: resetRequest.month,
+        previousRequestCount: requestCount,
+        effectiveRequestCount: 0,
+        approvedAt: resetRequest.approvedAt?.toISOString() || "",
+      },
+    });
+  } catch (error) {
+    next(error);
   }
 });
 

@@ -8530,6 +8530,16 @@ function SettingsModule({ profile }) {
     password: "",
     mustChangePassword: true,
   });
+  const [attendanceResetDraft, setAttendanceResetDraft] = useState({
+    employeeLookup: "",
+    month: currentPayrollMonth(),
+    justification: "",
+  });
+  const [attendanceReset, setAttendanceReset] = useState({
+    saving: false,
+    notice: "",
+    error: "",
+  });
   const [deviceControl, setDeviceControl] = useState({
     loading: true,
     saving: false,
@@ -8596,6 +8606,10 @@ function SettingsModule({ profile }) {
 
   function updateResetDraft(field, value) {
     setResetDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateAttendanceResetDraft(field, value) {
+    setAttendanceResetDraft((current) => ({ ...current, [field]: value }));
   }
 
   async function loadUsers() {
@@ -8697,6 +8711,36 @@ function SettingsModule({ profile }) {
       }));
     } catch (error) {
       setUserAdmin((current) => ({ ...current, saving: false, error: error.message || "Could not delete login user." }));
+    }
+  }
+
+  async function resetAttendanceRequestLimit() {
+    if (!attendanceResetDraft.employeeLookup.trim()) {
+      setAttendanceReset({ saving: false, notice: "", error: "Select or enter an employee to reset." });
+      return;
+    }
+    setAttendanceReset({ saving: true, notice: "", error: "" });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/settings/attendance-request-limit-resets`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        credentials: "include",
+        body: JSON.stringify({
+          employeeLookup: attendanceResetDraft.employeeLookup.trim(),
+          month: attendanceResetDraft.month || currentPayrollMonth(),
+          justification: attendanceResetDraft.justification.trim() || null,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message || "Could not reset attendance request count.");
+      setAttendanceReset({
+        saving: false,
+        notice: `Reset ${data.reset?.employee || "employee"} for ${data.reset?.month || attendanceResetDraft.month}. Previous count was ${data.reset?.previousRequestCount ?? 0}; effective count is now 0.`,
+        error: "",
+      });
+      setAttendanceResetDraft((current) => ({ ...current, justification: "" }));
+    } catch (error) {
+      setAttendanceReset({ saving: false, notice: "", error: error.message || "Could not reset attendance request count." });
     }
   }
 
@@ -8834,6 +8878,37 @@ function SettingsModule({ profile }) {
         ) : (
           <DataTable columns={["Employee", "Login", "Role", "Status", "Password", "Last login", "Action"]} rows={userRows.length ? userRows : [["No login users found", "-", "-", "-", "-", "-", "-"]]} />
         )}
+      </Panel>
+
+      <Panel title="Attendance Request Login Reset" meta="Admin tool">
+        <div className="dashboard-section-label">Reset monthly request count</div>
+        <div className="form-grid">
+          <SelectField
+            label="Login user"
+            value={attendanceResetDraft.employeeLookup}
+            onChange={(value) => updateAttendanceResetDraft("employeeLookup", value)}
+            options={[
+              { value: "", label: "Select user" },
+              ...userAdmin.users
+                .filter((user) => user.employee?.employeeCode || user.employee?.email)
+                .map((user) => ({
+                  value: user.employee?.employeeCode || user.employee?.email || user.email,
+                  label: `${user.employee?.fullName || user.email} (${user.employee?.employeeCode || user.email})`,
+                })),
+            ]}
+          />
+          <Field label="Employee code / email / name" value={attendanceResetDraft.employeeLookup} onChange={(value) => updateAttendanceResetDraft("employeeLookup", value)} />
+          <Field label="Month" type="month" value={attendanceResetDraft.month} onChange={(value) => updateAttendanceResetDraft("month", value)} />
+          <Field label="Admin note" value={attendanceResetDraft.justification} onChange={(value) => updateAttendanceResetDraft("justification", value)} />
+        </div>
+        <div className="modal-actions">
+          <span className="form-note">Use this when an employee is blocked at login because the monthly attendance correction limit was reached.</span>
+          <button className="secondary-btn" disabled={attendanceReset.saving || !attendanceResetDraft.employeeLookup.trim()} onClick={resetAttendanceRequestLimit}>
+            <ShieldCheck size={17} /> {attendanceReset.saving ? "Resetting..." : "Reset request count"}
+          </button>
+        </div>
+        {attendanceReset.notice && <div className="payroll-notice">{attendanceReset.notice}</div>}
+        {attendanceReset.error && <div className="form-error">{attendanceReset.error}</div>}
       </Panel>
 
       <Panel title="Login Device Control" meta={deviceControl.policy.loginDeviceRestrictionEnabled ? "Restricted" : "Open"}>
