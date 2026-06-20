@@ -575,13 +575,9 @@ function downloadCsv(filename, csv) {
   URL.revokeObjectURL(url);
 }
 
-const LEAVE_STORAGE_KEY = "hrguru_hrms_leave_requests_v1";
-const LEAVE_SETTINGS_STORAGE_KEY = "hrguru_hrms_leave_settings_v1";
 const LEAVE_DEDUCTION_ACK_STORAGE_KEY = "hrguru_hrms_leave_deduction_ack_v1";
-const HOLIDAY_STORAGE_KEY = "hrguru_hrms_holidays_v1";
 const ATTENDANCE_AFTER_CUTOFF_STORAGE_KEY = "hrguru_hrms_allow_attendance_after_cutoff_v1";
 const ATTENDANCE_GO_LIVE_DATE = "2026-06-01";
-const initialLeaveRequests = [];
 
 const defaultLeaveSettings = {
   annualCasualLeaves: 12,
@@ -606,52 +602,6 @@ const initialHolidays = [
 const casualLeaveReasons = ["Sick Leave", "Planned Leave", "Family Vacation", "Exam", "Study", "Personal Work", "Emergency"];
 const leaveTypes = ["Casual Leave", "Compensatory Off", "Work From Home", "Unpaid Leave"];
 const paidLeaveTypes = ["Casual Leave"];
-
-function loadStoredLeaveRequests() {
-  try {
-    const stored = window.localStorage.getItem(LEAVE_STORAGE_KEY);
-    if (!stored) return initialLeaveRequests;
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : initialLeaveRequests;
-  } catch {
-    return initialLeaveRequests;
-  }
-}
-
-function loadStoredLeaveSettings() {
-  try {
-    const stored = window.localStorage.getItem(LEAVE_SETTINGS_STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : {};
-    const casualLeaveBalances = { ...defaultLeaveSettings.casualLeaveBalances, ...(parsed.casualLeaveBalances || {}) };
-    if (parsed.balanceCorrectionVersion !== leaveBalanceCorrectionVersion) {
-      Object.assign(casualLeaveBalances, leaveBalanceCorrections);
-    }
-    return {
-      ...defaultLeaveSettings,
-      ...parsed,
-      compOffBalances: { ...defaultLeaveSettings.compOffBalances, ...(parsed.compOffBalances || {}) },
-      casualLeaveBalances,
-      balanceCorrectionVersion: leaveBalanceCorrectionVersion,
-    };
-  } catch {
-    return {
-      ...defaultLeaveSettings,
-      casualLeaveBalances: { ...defaultLeaveSettings.casualLeaveBalances, ...leaveBalanceCorrections },
-      balanceCorrectionVersion: leaveBalanceCorrectionVersion,
-    };
-  }
-}
-
-function loadStoredHolidays() {
-  try {
-    const stored = window.localStorage.getItem(HOLIDAY_STORAGE_KEY);
-    if (!stored) return initialHolidays;
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : initialHolidays;
-  } catch {
-    return initialHolidays;
-  }
-}
 
 function leaveDays(fromDate, toDate) {
   if (!fromDate || !toDate) return 0;
@@ -1444,9 +1394,13 @@ function App() {
   });
   const [sessionLoading, setSessionLoading] = useState(Boolean(sessionUser));
   const [employeeRecords, setEmployeeRecords] = useState(loadStoredEmployees);
-  const [leaveRecords, setLeaveRecords] = useState(loadStoredLeaveRequests);
-  const [leaveSettings, setLeaveSettings] = useState(loadStoredLeaveSettings);
-  const [holidayRecords, setHolidayRecords] = useState(loadStoredHolidays);
+  const [leaveRecords, setLeaveRecords] = useState([]);
+  const [leaveSettings, setLeaveSettings] = useState({
+    ...defaultLeaveSettings,
+    casualLeaveBalances: { ...defaultLeaveSettings.casualLeaveBalances, ...leaveBalanceCorrections },
+    balanceCorrectionVersion: leaveBalanceCorrectionVersion,
+  });
+  const [holidayRecords, setHolidayRecords] = useState(initialHolidays);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceRequests, setAttendanceRequests] = useState([]);
   const [saturdayRota, setSaturdayRota] = useState(loadStoredSaturdayRota);
@@ -1465,7 +1419,7 @@ function App() {
   const [clientSyncStatus, setClientSyncStatus] = useState("Local data");
   const [attendanceSyncStatus, setAttendanceSyncStatus] = useState("Not loaded");
   const [attendanceHydrated, setAttendanceHydrated] = useState(false);
-  const [leaveSyncStatus, setLeaveSyncStatus] = useState("Local data");
+  const [leaveSyncStatus, setLeaveSyncStatus] = useState("Not loaded");
   const role = sessionUser?.role || "admin";
   const baseProfile = roleProfiles[role] || roleProfiles.employee;
   const profile = {
@@ -1524,21 +1478,10 @@ function App() {
   }, [sessionUser]);
 
   useEffect(() => {
-    window.localStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(leaveRecords));
-  }, [leaveRecords]);
-
-  useEffect(() => {
-    window.localStorage.setItem(LEAVE_SETTINGS_STORAGE_KEY, JSON.stringify(leaveSettings));
-  }, [leaveSettings]);
-
-  useEffect(() => {
-    window.localStorage.setItem(HOLIDAY_STORAGE_KEY, JSON.stringify(holidayRecords));
-  }, [holidayRecords]);
-
-  useEffect(() => {
     let cancelled = false;
     if (!sessionUser) {
-      setLeaveSyncStatus("Local data");
+      setLeaveRecords([]);
+      setLeaveSyncStatus("Not loaded");
       return;
     }
 
@@ -1555,7 +1498,10 @@ function App() {
         setLeaveSyncStatus("Database connected");
       })
       .catch(() => {
-        if (!cancelled) setLeaveSyncStatus("Using local data");
+        if (!cancelled) {
+          setLeaveRecords([]);
+          setLeaveSyncStatus("Database unavailable - leave cannot be applied");
+        }
       });
 
     return () => {
@@ -6479,6 +6425,7 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
   const [typeFilter, setTypeFilter] = useState("All");
   const [leaveError, setLeaveError] = useState("");
   const canManageHolidays = role === "admin" || role === "hr";
+  const leaveDbConnected = syncStatus === "Database connected";
   const scopedEmployees = employees.filter((employee) => {
     if (role === "employee") return employee.name === profile.name;
     if (role === "manager") return employee.name === profile.name || employee.manager === profile.name;
@@ -6571,6 +6518,10 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
   }
 
   async function submitLeave() {
+    if (!leaveDbConnected) {
+      setLeaveError("Database not connected; leave cannot be applied.");
+      return;
+    }
     if (!canSubmit) {
       if (exceedsBalance) setLeaveError(balanceMessage);
       else if (duplicateLeaveRequest) setLeaveError(duplicateLeaveMessage);
@@ -6604,7 +6555,7 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
       setShowApplyForm(false);
     } catch (error) {
       if (error.message === "Failed to fetch") {
-        setLeaveError("Backend server is not running. Leave request was not saved.");
+        setLeaveError("Database not connected; leave cannot be applied.");
       } else {
         setLeaveError(error.message);
       }
@@ -6612,6 +6563,10 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
   }
 
   async function updateStatus(id, status) {
+    if (!leaveDbConnected) {
+      setLeaveError("Database not connected; leave request cannot be updated.");
+      return;
+    }
     setLeaveError("");
     try {
       const response = await fetch(`${API_BASE_URL}/api/leave/${id}/${status === "Approved" ? "approve" : "reject"}`, {
@@ -6628,6 +6583,10 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
   }
 
   async function cancelLeave(id) {
+    if (!leaveDbConnected) {
+      setLeaveError("Database not connected; leave request cannot be cancelled.");
+      return;
+    }
     setLeaveError("");
     try {
       const response = await fetch(`${API_BASE_URL}/api/leave/${id}/cancel`, {
@@ -6644,6 +6603,10 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
   }
 
   async function createHoliday(draft) {
+    if (!leaveDbConnected) {
+      setLeaveError("Database not connected; holiday cannot be saved.");
+      return;
+    }
     const nextHoliday = {
       id: `HOL-${Date.now().toString().slice(-6)}`,
       date: draft.date,
@@ -6665,12 +6628,15 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
       if (!response.ok) throw new Error(data.error?.message || "Holiday could not be saved.");
       setHolidays((current) => [data.holiday, ...current.filter((holiday) => holiday.id !== data.holiday.id)]);
     } catch (error) {
-      setLeaveError(error.message === "Failed to fetch" ? "Backend server is not running. Holiday stayed local." : error.message);
-      setHolidays((current) => [nextHoliday, ...current.filter((holiday) => !(holiday.date === nextHoliday.date && holiday.name === nextHoliday.name))]);
+      setLeaveError(error.message === "Failed to fetch" ? "Database not connected; holiday cannot be saved." : error.message);
     }
   }
 
   async function archiveHoliday(id) {
+    if (!leaveDbConnected) {
+      setLeaveError("Database not connected; holiday cannot be archived.");
+      return;
+    }
     setLeaveError("");
     try {
       const response = await fetch(`${API_BASE_URL}/api/leave/holidays/${id}`, {
@@ -6682,8 +6648,7 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
       if (!response.ok) throw new Error(data.error?.message || "Holiday could not be archived.");
       setHolidays((current) => current.filter((holiday) => holiday.id !== data.holiday?.id));
     } catch (error) {
-      setLeaveError(error.message === "Failed to fetch" ? "Backend server is not running. Holiday was archived locally." : error.message);
-      setHolidays((current) => current.filter((holiday) => holiday.id !== id));
+      setLeaveError(error.message === "Failed to fetch" ? "Database not connected; holiday cannot be archived." : error.message);
     }
   }
 
@@ -6691,10 +6656,11 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
     <div className="stack">
       <div className="leave-layout full">
         <Panel title={role === "employee" ? "My Leave" : role === "manager" ? "Team Leave" : "Leave Requests"} meta={`${filteredRequests.length} shown Â· ${syncStatus}`}>
+          {!leaveDbConnected && <div className="form-error attendance-error">Database not connected; leave cannot be applied.</div>}
           {leaveError && <div className="form-error attendance-error">{leaveError}</div>}
           {showApplyForm && duplicateLeaveMessage && <div className="form-error attendance-error">{duplicateLeaveMessage}</div>}
           <div className="toolbar">
-            <button className="primary-btn" onClick={() => setShowApplyForm(true)}><CalendarCheck size={17} /> Apply leave</button>
+            <button className="primary-btn" disabled={!leaveDbConnected} onClick={() => setShowApplyForm(true)}><CalendarCheck size={17} /> Apply leave</button>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Leave status filter">
               <option>All</option>
               <option>Pending</option>
@@ -6706,11 +6672,11 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
               {leaveTypes.map((type) => <option key={type}>{type}</option>)}
             </select>
             <button className="secondary-btn" onClick={() => setPolicyOpen(true)}><FileText size={17} /> Policy</button>
-            {canApprove && <button className="secondary-btn" onClick={() => setSettingsOpen(true)}><Settings size={17} /> Leave settings</button>}
+            {canApprove && <button className="secondary-btn" disabled={!leaveDbConnected} onClick={() => setSettingsOpen(true)}><Settings size={17} /> Leave settings</button>}
           </div>
 
           {role === "employee" && <LeaveBalancePanel employee={selectedEmployee} balances={selectedBalances} compact />}
-          <NationalHolidayCalendar holidays={holidays} canManage={canManageHolidays} onCreate={createHoliday} onArchive={archiveHoliday} />
+          <NationalHolidayCalendar holidays={holidays} canManage={canManageHolidays && leaveDbConnected} onCreate={createHoliday} onArchive={archiveHoliday} />
 
           <div className="leave-card-grid">
             {filteredRequests.length ? filteredRequests.map((request) => (
@@ -6727,13 +6693,13 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
                 </div>
                 {canApprove && (
                   <div className="leave-card-actions">
-                    <button className="secondary-btn" disabled={request.status !== "Pending"} onClick={() => updateStatus(request.id, "Approved")}>Approve</button>
-                    <button className="secondary-btn" disabled={request.status !== "Pending"} onClick={() => updateStatus(request.id, "Rejected")}>Reject</button>
+                    <button className="secondary-btn" disabled={!leaveDbConnected || request.status !== "Pending"} onClick={() => updateStatus(request.id, "Approved")}>Approve</button>
+                    <button className="secondary-btn" disabled={!leaveDbConnected || request.status !== "Pending"} onClick={() => updateStatus(request.id, "Rejected")}>Reject</button>
                   </div>
                 )}
                 {request.status === "Pending" && (
                   <div className="leave-card-actions">
-                    <button className="secondary-btn" onClick={() => cancelLeave(request.id)}>Cancel request</button>
+                    <button className="secondary-btn" disabled={!leaveDbConnected} onClick={() => cancelLeave(request.id)}>Cancel request</button>
                   </div>
                 )}
               </article>
