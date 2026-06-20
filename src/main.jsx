@@ -1447,8 +1447,8 @@ function App() {
   const [leaveRecords, setLeaveRecords] = useState(loadStoredLeaveRequests);
   const [leaveSettings, setLeaveSettings] = useState(loadStoredLeaveSettings);
   const [holidayRecords, setHolidayRecords] = useState(loadStoredHolidays);
-  const [attendanceRecords, setAttendanceRecords] = useState(loadStoredAttendance);
-  const [attendanceRequests, setAttendanceRequests] = useState(loadStoredAttendanceRequests);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceRequests, setAttendanceRequests] = useState([]);
   const [saturdayRota, setSaturdayRota] = useState(loadStoredSaturdayRota);
   const [candidateRecords, setCandidateRecords] = useState(loadStoredCandidates);
   const [clientRecords, setClientRecords] = useState(loadStoredClients);
@@ -1463,7 +1463,7 @@ function App() {
   const [switchProfileOpen, setSwitchProfileOpen] = useState(false);
   const [employeeSyncStatus, setEmployeeSyncStatus] = useState("Local data");
   const [clientSyncStatus, setClientSyncStatus] = useState("Local data");
-  const [attendanceSyncStatus, setAttendanceSyncStatus] = useState("Local data");
+  const [attendanceSyncStatus, setAttendanceSyncStatus] = useState("Not loaded");
   const [attendanceHydrated, setAttendanceHydrated] = useState(false);
   const [leaveSyncStatus, setLeaveSyncStatus] = useState("Local data");
   const role = sessionUser?.role || "admin";
@@ -1640,21 +1640,15 @@ function App() {
   }, [sessionUser]);
 
   useEffect(() => {
-    window.localStorage.setItem(ATTENDANCE_STORAGE_KEY, JSON.stringify(attendanceRecords));
-  }, [attendanceRecords]);
-
-  useEffect(() => {
-    window.localStorage.setItem(ATTENDANCE_REQUEST_STORAGE_KEY, JSON.stringify(attendanceRequests));
-  }, [attendanceRequests]);
-
-  useEffect(() => {
     window.localStorage.setItem(SATURDAY_ROTA_STORAGE_KEY, JSON.stringify(saturdayRota));
   }, [saturdayRota]);
 
   useEffect(() => {
     let cancelled = false;
     if (!sessionUser) {
-      setAttendanceSyncStatus("Local data");
+      setAttendanceRecords([]);
+      setAttendanceRequests([]);
+      setAttendanceSyncStatus("Not loaded");
       setAttendanceHydrated(false);
       return;
     }
@@ -1671,19 +1665,17 @@ function App() {
       .then((data) => {
         if (cancelled) return;
         const fetchedAttendance = data.attendance || [];
-        const fetchedKeys = new Set(fetchedAttendance.map((record) => `${record.employeeId}-${record.date}`));
-        setAttendanceRecords((records) => [
-          ...fetchedAttendance,
-          ...records.filter((record) => !fetchedKeys.has(`${record.employeeId}-${record.date}`)),
-        ]);
+        setAttendanceRecords(fetchedAttendance);
         setAttendanceRequests(data.requests || []);
         setAttendanceSyncStatus("Database connected");
         setAttendanceHydrated(true);
       })
       .catch(() => {
         if (!cancelled) {
-          setAttendanceSyncStatus("Using local data");
-          setAttendanceHydrated(true);
+          setAttendanceRecords([]);
+          setAttendanceRequests([]);
+          setAttendanceSyncStatus("Database unavailable - attendance cannot be marked");
+          setAttendanceHydrated(false);
         }
       });
 
@@ -2043,7 +2035,7 @@ function App() {
           }}
         />
       )}
-      {attendancePromptEmployee && attendanceHydrated && (
+      {attendancePromptEmployee && attendanceHydrated && attendanceSyncStatus === "Database connected" && (
         <PostLoginAttendancePrompt
           employee={attendancePromptEmployee}
           attendanceRecords={attendanceRecords}
@@ -2053,7 +2045,7 @@ function App() {
           onLogout={handleLogout}
         />
       )}
-      {attendancePromptEmployee && attendanceHydrated && (
+      {attendancePromptEmployee && attendanceHydrated && attendanceSyncStatus === "Database connected" && (
         <LeaveDeductionNotice
           employee={attendancePromptEmployee}
           leaveRecords={leaveRecords}
@@ -5354,6 +5346,7 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
     Late: dailyRows.filter((row) => row.status === "Late").length,
   };
   const canUseSelfAttendance = role === "employee" || role === "manager";
+  const attendanceDbConnected = syncStatus === "Database connected";
   const ownEmployee = canUseSelfAttendance ? scopedEmployees.find((employee) => employee.name === profile.name) : null;
   const ownTodayRecord = ownEmployee ? attendanceRecords.find((record) => record.employeeId === ownEmployee.employeeId && record.date === today) : null;
   const isTodayAttendanceComplete = Boolean(ownTodayRecord?.checkIn && ownTodayRecord?.checkOut);
@@ -5586,6 +5579,10 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
   }
 
   function openAttendanceRequest(type, sourceRecord = {}) {
+    if (!attendanceDbConnected) {
+      setAttendanceError("Database not connected; attendance cannot be marked.");
+      return;
+    }
     if (!previousCheckoutMissing && isTodayAttendanceComplete) {
       setAttendanceError("Attendance is already completed for today. No further checkout or attendance request is needed.");
       return;
@@ -5653,6 +5650,10 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
 
   async function markOwnAttendance(field) {
     if (!ownEmployee) return;
+    if (!attendanceDbConnected) {
+      setAttendanceError("Database not connected; attendance cannot be marked.");
+      return;
+    }
     const now = currentTimeValue();
     const current = attendanceRecords.find((record) => record.employeeId === ownEmployee.employeeId && record.date === today) || {
       ...defaultAttendanceFor(ownEmployee, today, leaveRecords),
@@ -5734,6 +5735,10 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
   }
 
   async function updateAttendance(employee, field, value) {
+    if (!attendanceDbConnected) {
+      setAttendanceError("Database not connected; attendance cannot be marked.");
+      return;
+    }
     const current = attendanceRecords.find((record) => record.employeeId === employee.employeeId && record.date === selectedDate) ||
       defaultAttendanceFor(employee, selectedDate, leaveRecords);
     let next = { ...current, [field]: value };
@@ -5744,23 +5749,25 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
     }
     if (field === "checkIn" || field === "checkOut") next.hours = String(hoursBetween(next.checkIn, next.checkOut) || next.hours || "");
     if (next.checkIn && next.checkOut) next = applyHoursRules(employee, next);
-    mergeAttendance(next);
     setAttendanceError("");
     try {
       const saved = await saveAttendanceRecord(next);
       mergeAttendance(saved);
     } catch (error) {
-      setAttendanceError(error.message === "Failed to fetch" ? "Backend server is not running. Attendance change stayed local." : error.message);
+      setAttendanceError(error.message === "Failed to fetch" ? "Database not connected; attendance cannot be marked." : error.message);
     }
   }
 
   async function saveDefaults() {
+    if (!attendanceDbConnected) {
+      setAttendanceError("Database not connected; attendance cannot be marked.");
+      return;
+    }
     const explicitKeys = new Set(attendanceRecords.filter((record) => record.date === selectedDate).map((record) => record.employeeId));
     const defaults = scopedEmployees
       .filter((employee) => !explicitKeys.has(employee.employeeId))
       .map((employee) => defaultAttendanceFor(employee, selectedDate, leaveRecords));
     if (!defaults.length) return;
-    setAttendanceRecords((records) => [...defaults, ...records]);
     setAttendanceError("");
     try {
       const savedRows = await Promise.all(defaults.map(saveAttendanceRecord));
@@ -5769,7 +5776,7 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
         return [...savedRows, ...records.filter((record) => !savedKeys.has(`${record.employeeId}-${record.date}`))];
       });
     } catch (error) {
-      setAttendanceError(error.message === "Failed to fetch" ? "Backend server is not running. Filled attendance stayed local." : error.message);
+      setAttendanceError(error.message === "Failed to fetch" ? "Database not connected; attendance cannot be marked." : error.message);
     }
   }
 
@@ -5913,27 +5920,14 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       if (data.attendance) mergeAttendance(data.attendance);
       mergeLeaveDeduction(data.leaveDeduction);
     } catch (error) {
-      setAttendanceError(error.message === "Failed to fetch" ? "Backend server is not running. Approval stayed local." : error.message);
-      if (status === "Approved") {
-        const next = {
-          employeeId: request.employeeId,
-          employee: request.employee,
-          date: request.date,
-          status: request.statusValue,
-          checkIn: ["Present", "Late", "Remote"].includes(request.statusValue) ? request.checkIn : "",
-          checkOut: ["Present", "Late", "Remote"].includes(request.statusValue) ? request.checkOut : "",
-          hours: ["Present", "Late", "Remote"].includes(request.statusValue) ? request.hours : "0",
-          notes: `Approved correction: ${request.reason}`,
-        };
-        mergeAttendance(next);
-      }
-      setAttendanceRequests((requests) => requests.map((item) => item.id === id ? { ...item, status } : item));
+      setAttendanceError(error.message === "Failed to fetch" ? "Database not connected; attendance request was not updated." : error.message);
     }
   }
 
   return (
     <div className="stack">
       <Panel title={role === "employee" ? "My Attendance" : role === "manager" ? "Team Attendance" : "Daily Attendance"} meta={`${filteredRows.length} shown Â· ${syncStatus}`}>
+        {!attendanceDbConnected && <div className="form-error attendance-error">Database not connected; attendance cannot be marked.</div>}
         {attendanceError && <div className="form-error attendance-error">{attendanceError}</div>}
         {canUseSelfAttendance && ownEmployee && (
           <div className="attendance-actions">
@@ -5946,13 +5940,13 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
                 </span>
               )}
             </div>
-            {!ownTodayRecord?.checkIn && <button className="primary-btn" onClick={() => markOwnAttendance("checkIn")}>Check in</button>}
-            <button className="secondary-btn" disabled={!canCheckOutNow()} title={checkOutBlockMessage()} onClick={() => markOwnAttendance("checkOut")}>Check out</button>
+            {!ownTodayRecord?.checkIn && <button className="primary-btn" disabled={!attendanceDbConnected} onClick={() => markOwnAttendance("checkIn")}>Check in</button>}
+            <button className="secondary-btn" disabled={!attendanceDbConnected || !canCheckOutNow()} title={attendanceDbConnected ? checkOutBlockMessage() : "Database not connected; attendance cannot be marked."} onClick={() => markOwnAttendance("checkOut")}>Check out</button>
             {isTodayAttendanceComplete ? (
               <span className="form-note">Good job, you&apos;re done for the day. You worked for {todayWorkedHours} hour{todayWorkedHours === 1 ? "" : "s"} today.</span>
             ) : (
               <label className="action-select-wrap">
-                <select value="" onChange={(event) => {
+                <select value="" disabled={!attendanceDbConnected} onChange={(event) => {
                   const value = event.target.value;
                   if (!value) return;
                   const sourceRecord = value === "Forgot to punch" && previousCheckoutMissing ? ownPreviousOpenRecord : ownTodayRecord || {};
@@ -5983,13 +5977,13 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
               <input type="date" value={selectedDate} onInput={(event) => setSelectedDate(event.target.value)} onChange={(event) => setSelectedDate(event.target.value)} />
             </label>
           )}
-          {role === "admin" && <button className="secondary-btn" onClick={saveDefaults}><CheckCircle2 size={17} /> Fill day sheet</button>}
+          {role === "admin" && <button className="secondary-btn" disabled={!attendanceDbConnected} onClick={saveDefaults}><CheckCircle2 size={17} /> Fill day sheet</button>}
         </div>
 
         <DataTable columns={["Employee", "Status", "Check-in", "Check-out", "Hours", ...(role === "admin" || role === "hr" ? ["Action"] : [])]} rows={filteredRows.map((row) => {
           const employee = employees.find((item) => item.employeeId === row.employeeId);
           const leaveLocked = Boolean(approvedLeaveForDate(row.employeeId, selectedDate, leaveRecords));
-          const readOnly = role === "employee" || !canManage || leaveLocked;
+          const readOnly = role === "employee" || !canManage || leaveLocked || !attendanceDbConnected;
           const timeReadOnly = readOnly || ["Leave", "Absent"].includes(row.status);
           const cells = [
             <Person key={`${row.employeeId}-person`} name={row.employee} detail={`${row.employeeId} Â· ${employee?.dept || ""}`} />,
