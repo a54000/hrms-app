@@ -1457,7 +1457,7 @@ function App() {
     }
 
     setEmployeeSyncStatus("Loading from database...");
-    fetch(`${API_BASE_URL}/api/employees`, { credentials: "include" })
+    fetch(`${API_BASE_URL}/api/employees`, { credentials: "include", cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error?.message || "Unable to load employee data.");
@@ -1486,7 +1486,7 @@ function App() {
     }
 
     setLeaveSyncStatus("Loading from database...");
-    fetch(`${API_BASE_URL}/api/leave`, { credentials: "include" })
+    fetch(`${API_BASE_URL}/api/leave`, { credentials: "include", cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error?.message || "Unable to load leave data.");
@@ -1539,6 +1539,7 @@ function App() {
         const response = await fetch(`${API_BASE_URL}/api/leave/balances`, {
           headers: authHeaders(),
           credentials: "include",
+          cache: "no-store",
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error?.message || "Unable to load leave balances.");
@@ -1550,6 +1551,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/api/leave/balances/${employeeCode}`, {
         headers: authHeaders(),
         credentials: "include",
+        cache: "no-store",
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error?.message || "Unable to load leave balance.");
@@ -1569,7 +1571,7 @@ function App() {
     if (!sessionUser) return;
 
     const year = new Date().getFullYear();
-    fetch(`${API_BASE_URL}/api/leave/holidays?year=${year}`, { credentials: "include" })
+    fetch(`${API_BASE_URL}/api/leave/holidays?year=${year}`, { credentials: "include", cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error?.message || "Unable to load holidays.");
@@ -1602,7 +1604,7 @@ function App() {
     const month = new Date().toISOString().slice(0, 7);
     setAttendanceSyncStatus("Loading from database...");
     setAttendanceHydrated(false);
-    fetch(`${API_BASE_URL}/api/attendance?month=${month}`, { credentials: "include" })
+    fetch(`${API_BASE_URL}/api/attendance?month=${month}`, { credentials: "include", cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error?.message || "Unable to load attendance data.");
