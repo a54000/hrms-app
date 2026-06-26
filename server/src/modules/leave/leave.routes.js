@@ -32,6 +32,7 @@ const leaveSchema = z.object({
   toDate: z.string().min(1),
   days: z.union([z.string(), z.number()]).optional().nullable(),
   reason: z.string().optional().nullable(),
+  overrideAttendanceConflict: z.boolean().optional(),
 });
 
 const holidaySchema = z.object({
@@ -130,6 +131,7 @@ function selectLeave() {
     status: true,
     createdAt: true,
     employee: { select: { employeeCode: true, fullName: true, manager: { select: { fullName: true } } } },
+    createdBy: { select: { employee: { select: { fullName: true } }, email: true } },
     approver: { select: { employee: { select: { fullName: true } }, email: true } },
   };
 }
@@ -146,8 +148,53 @@ function publicLeave(request) {
     reason: request.reason || "",
     status: approvalLabelMap[request.status],
     approver: request.approver?.employee?.fullName || request.employee.manager?.fullName || "HR",
+    createdBy: request.createdBy?.employee?.fullName || request.createdBy?.email || "",
     createdAt: toDateString(request.createdAt),
   };
+}
+
+function canOverrideAttendanceConflict(user) {
+  return ["admin", "hr"].includes(user?.role);
+}
+
+async function auditLeave(request, action, entityId, beforeData = null, afterData = null) {
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: request.user?.id,
+      module: "leave",
+      action,
+      entityTable: "LeaveRequest",
+      entityId,
+      beforeData,
+      afterData,
+      ipAddress: request.ip,
+      userAgent: request.get("user-agent") || "",
+    },
+  });
+}
+
+async function attendanceConflictsForLeave(tx, employeeId, fromDate, toDateValue) {
+  return tx.attendanceRecord.findMany({
+    where: {
+      employeeId,
+      attendanceDate: { gte: fromDate, lte: toDateValue },
+      OR: [
+        { checkIn: { not: null } },
+        { checkOut: { not: null } },
+        { status: { in: ["present", "remote", "late", "half_day"] } },
+      ],
+    },
+    orderBy: { attendanceDate: "asc" },
+    select: { attendanceDate: true, status: true, checkIn: true, checkOut: true },
+  });
+}
+
+function assertAttendanceOverrideAllowed(conflicts, request, overrideAttendanceConflict) {
+  if (!conflicts.length) return;
+  if (overrideAttendanceConflict && canOverrideAttendanceConflict(request.user)) return;
+  const dates = conflicts.map((row) => toDateString(row.attendanceDate)).join(", ");
+  const suffix = canOverrideAttendanceConflict(request.user) ? " Resubmit with overrideAttendanceConflict=true to override." : "";
+  throw httpError(409, `Attendance already exists for ${dates}; leave cannot be created or approved without admin override.${suffix}`);
 }
 
 function publicHoliday(holiday) {
@@ -421,7 +468,9 @@ router.post("/", async (request, response, next) => {
         const available = await leaveAvailable(employee, parsed.data.type);
         if (requestedDays > available) throw httpError(400, `Only ${available} ${parsed.data.type} day${available === 1 ? "" : "s"} available.`);
       }
-      return tx.leaveRequest.create({
+      const attendanceConflicts = await attendanceConflictsForLeave(tx, employee.id, fromDate, toDateValue);
+      assertAttendanceOverrideAllowed(attendanceConflicts, request, parsed.data.overrideAttendanceConflict);
+      const leaveRequest = await tx.leaveRequest.create({
         data: {
           employeeId: employee.id,
           leaveType: parsed.data.type,
@@ -429,9 +478,27 @@ router.post("/", async (request, response, next) => {
           toDate: toDateValue,
           days: requestedDays,
           reason: parsed.data.reason || null,
+          createdById: request.user.id,
         },
         select: selectLeave(),
       });
+      await tx.auditLog.create({
+        data: {
+          actorUserId: request.user.id,
+          module: "leave",
+          action: parsed.data.overrideAttendanceConflict && attendanceConflicts.length ? "created_with_attendance_override" : "created",
+          entityTable: "LeaveRequest",
+          entityId: leaveRequest.id,
+          beforeData: null,
+          afterData: {
+            leaveRequest: publicLeave(leaveRequest),
+            attendanceConflictDates: attendanceConflicts.map((row) => toDateString(row.attendanceDate)),
+          },
+          ipAddress: request.ip,
+          userAgent: request.get("user-agent") || "",
+        },
+      });
+      return leaveRequest;
     }, { isolationLevel: "Serializable" });
     response.status(201).json({ leaveRequest: publicLeave(requestRecord) });
   } catch (error) {
@@ -456,14 +523,16 @@ router.get("/balances/:employeeId", async (request, response, next) => {
   }
 });
 
-async function decideLeave(id, status, approverId) {
+async function decideLeave(request, id, status) {
   const existing = await prisma.leaveRequest.findUnique({
     where: { id },
-    select: { id: true, employeeId: true, leaveType: true, fromDate: true, toDate: true, days: true, employee: true },
+    select: { id: true, employeeId: true, leaveType: true, fromDate: true, toDate: true, days: true, status: true, reason: true, employee: true },
   });
   if (!existing) throw httpError(404, "Leave request not found.");
   if (status === approvalValueMap.Approved) {
     await assertNoApprovedLeaveOverlap(existing);
+    const conflicts = await attendanceConflictsForLeave(prisma, existing.employeeId, existing.fromDate, existing.toDate);
+    assertAttendanceOverrideAllowed(conflicts, request, Boolean(request.body?.overrideAttendanceConflict));
     if (!["Work From Home", "Unpaid Leave"].includes(existing.leaveType)) {
       const requestedDays = Number(existing.days || dayCount(toDateString(existing.fromDate), toDateString(existing.toDate)));
       const available = await leaveAvailable(existing.employee, existing.leaveType, existing.id);
@@ -474,17 +543,24 @@ async function decideLeave(id, status, approverId) {
     where: { id },
     data: {
       status,
-      approverId,
-      approvedAt: new Date(),
+      approverId: request.user.id,
+      approvedAt: status === approvalValueMap.Approved ? new Date() : null,
     },
     select: selectLeave(),
+  });
+  await auditLeave(request, status === approvalValueMap.Approved ? "approved" : "rejected", leaveRequest.id, {
+    status: approvalLabelMap[existing.status],
+    reason: existing.reason || "",
+  }, {
+    ...publicLeave(leaveRequest),
+    overrideAttendanceConflict: Boolean(request.body?.overrideAttendanceConflict),
   });
   return publicLeave(leaveRequest);
 }
 
 router.patch("/:id/approve", requireRole("admin", "hr", "manager"), async (request, response, next) => {
   try {
-    response.json({ leaveRequest: await decideLeave(request.params.id, approvalValueMap.Approved, request.user.id) });
+    response.json({ leaveRequest: await decideLeave(request, request.params.id, approvalValueMap.Approved) });
   } catch (error) {
     if (error.code === "P2025") next(httpError(404, "Leave request not found."));
     else next(error);
@@ -493,7 +569,7 @@ router.patch("/:id/approve", requireRole("admin", "hr", "manager"), async (reque
 
 router.patch("/:id/reject", requireRole("admin", "hr", "manager"), async (request, response, next) => {
   try {
-    response.json({ leaveRequest: await decideLeave(request.params.id, approvalValueMap.Rejected, request.user.id) });
+    response.json({ leaveRequest: await decideLeave(request, request.params.id, approvalValueMap.Rejected) });
   } catch (error) {
     if (error.code === "P2025") next(httpError(404, "Leave request not found."));
     else next(error);
@@ -508,6 +584,11 @@ router.patch("/:id/cancel", async (request, response, next) => {
         id: true,
         employeeId: true,
         status: true,
+        reason: true,
+        leaveType: true,
+        fromDate: true,
+        toDate: true,
+        days: true,
         employee: { select: { managerId: true } },
       },
     });
@@ -524,10 +605,18 @@ router.patch("/:id/cancel", async (request, response, next) => {
         status: "rejected",
         reason: "Cancelled by requester",
         approverId: request.user.id,
-        approvedAt: new Date(),
+        approvedAt: null,
       },
       select: selectLeave(),
     });
+    await auditLeave(request, "cancelled", leaveRequest.id, {
+      status: approvalLabelMap[existing.status],
+      leaveType: existing.leaveType,
+      fromDate: toDateString(existing.fromDate),
+      toDate: toDateString(existing.toDate),
+      days: existing.days?.toString() || "0",
+      reason: existing.reason || "",
+    }, publicLeave(leaveRequest));
     response.json({ leaveRequest: publicLeave(leaveRequest) });
   } catch (error) {
     if (error.code === "P2025") next(httpError(404, "Leave request not found."));

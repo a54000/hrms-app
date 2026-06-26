@@ -743,6 +743,7 @@ function leaveToApi(request) {
     toDate: request.toDate,
     days: request.days,
     reason: request.reason || "",
+    overrideAttendanceConflict: Boolean(request.overrideAttendanceConflict),
   };
 }
 
@@ -913,8 +914,17 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
   const today = todayLocalDate();
   const rows = applicableDates.map((date) => {
     const leave = approvedLeaveForDate(employee.employeeId, date, leaveRecords);
-    if (leave) return { ...defaultAttendanceFor(employee, date, leaveRecords), leaveType: leave.type, leaveDays: Number(leave.days || 1) };
     const attendance = attendanceRecords.find((record) => record.employeeId === employee.employeeId && record.date === date);
+    if (leave && attendance) {
+      return {
+        ...attendance,
+        leaveType: leave.type,
+        leaveDays: Number(leave.days || 1),
+        leaveConflict: true,
+        notes: [attendance.notes, `Conflict: approved ${leave.type} also exists`].filter(Boolean).join(" | "),
+      };
+    }
+    if (leave) return { ...defaultAttendanceFor(employee, date, leaveRecords), leaveType: leave.type, leaveDays: Number(leave.days || 1) };
     if (attendance) return { ...attendance, leaveType: "" };
     if (isNonWorkingDay(date)) return { ...defaultAttendanceFor(employee, date, leaveRecords), leaveType: "" };
     if (date > today) return { ...defaultAttendanceFor(employee, date, leaveRecords), leaveType: "" };
@@ -941,6 +951,7 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
   const deductions = Math.round(absentDays * perDay);
   const netPay = Math.max(Math.round(monthlySalary - deductions), 0);
   const key = `${month}:${employee.employeeId}:${employee.legalEntity || "HRGP"}`;
+  const leaveConflicts = rows.filter((row) => row.leaveConflict).map((row) => `${row.date}: ${row.leaveType}`);
   return {
     key,
     employee,
@@ -955,6 +966,7 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
     monthlySalary,
     deductions,
     netPay,
+    leaveConflicts,
     status: payrollStatus[key] || "Draft",
   };
 }
@@ -1051,6 +1063,7 @@ function payrollRowsToCsv(month, rows) {
     ["gross", "Gross Salary"],
     ["deductions", "Deductions"],
     ["netPay", "Net Payable"],
+    ["leaveConflicts", "Attendance/Leave Conflicts"],
     ["status", "Payroll Status"],
     ["pan", "PAN"],
     ["bankName", "Bank Name"],
@@ -1072,6 +1085,7 @@ function payrollRowsToCsv(month, rows) {
     gross: row.monthlySalary,
     deductions: row.deductions,
     netPay: row.netPay,
+    leaveConflicts: row.leaveConflicts?.join("; ") || "",
     status: row.status,
     pan: row.employee.pan,
     bankName: row.employee.bankName,
@@ -6434,6 +6448,7 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
   const [typeFilter, setTypeFilter] = useState("All");
   const [leaveError, setLeaveError] = useState("");
   const canManageHolidays = role === "admin" || role === "hr";
+  const canOverrideAttendanceConflict = role === "admin" || role === "hr";
   const leaveDbConnected = syncStatus === "Database connected";
   const scopedEmployees = employees.filter((employee) => {
     if (role === "employee") return employee.name === profile.name;
@@ -6552,13 +6567,22 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
     };
     setLeaveError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/leave`, {
+      const saveRequest = async (overrideAttendanceConflict = false) => fetch(`${API_BASE_URL}/api/leave`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
-        body: JSON.stringify(leaveToApi(nextRequest)),
+        body: JSON.stringify(leaveToApi({ ...nextRequest, overrideAttendanceConflict })),
       });
+      let response = await saveRequest(false);
       const data = await response.json().catch(() => ({}));
+      if (!response.ok && response.status === 409 && canOverrideAttendanceConflict && window.confirm(`${data.error?.message || "Attendance already exists for this date."}\n\nCreate this leave anyway with admin override?`)) {
+        response = await saveRequest(true);
+        const overrideData = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(overrideData.error?.message || "Leave request could not be submitted.");
+        setLeaveRecords((current) => [overrideData.leaveRequest, ...current]);
+        setShowApplyForm(false);
+        return;
+      }
       if (!response.ok) throw new Error(data.error?.message || "Leave request could not be submitted.");
       setLeaveRecords((current) => [data.leaveRequest, ...current]);
       setShowApplyForm(false);
@@ -6578,12 +6602,21 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
     }
     setLeaveError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/leave/${id}/${status === "Approved" ? "approve" : "reject"}`, {
+      const saveStatus = async (overrideAttendanceConflict = false) => fetch(`${API_BASE_URL}/api/leave/${id}/${status === "Approved" ? "approve" : "reject"}`, {
         method: "PATCH",
-        headers: authHeaders(),
+        headers: authHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
+        body: JSON.stringify({ overrideAttendanceConflict }),
       });
+      let response = await saveStatus(false);
       const data = await response.json().catch(() => ({}));
+      if (!response.ok && response.status === 409 && status === "Approved" && canOverrideAttendanceConflict && window.confirm(`${data.error?.message || "Attendance already exists for this date."}\n\nApprove this leave anyway with admin override?`)) {
+        response = await saveStatus(true);
+        const overrideData = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(overrideData.error?.message || "Leave request could not be updated.");
+        setLeaveRecords((current) => current.map((request) => request.id === id ? overrideData.leaveRequest : request));
+        return;
+      }
       if (!response.ok) throw new Error(data.error?.message || "Leave request could not be updated.");
       setLeaveRecords((current) => current.map((request) => request.id === id ? data.leaveRequest : request));
     } catch (error) {
@@ -7225,6 +7258,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
     if (!row.monthlySalary) issues.push("Monthly salary missing");
     if (!row.employee.bankAccount) issues.push("Bank account missing");
     if (row.absentDays > 0) issues.push(`${row.absentDays} unpaid/absent day${row.absentDays === 1 ? "" : "s"} deducted`);
+    if (row.leaveConflicts?.length) issues.push(`Attendance/leave conflict on ${row.leaveConflicts.join("; ")}`);
     if (row.status === "Paid") issues.push("Already marked paid");
     return { ...row, issues, reviewStatus: issues.length ? "Needs review" : "Clean" };
   });
@@ -7307,6 +7341,9 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
                 <Info label="Present days" value={payslip.presentDays} />
                 <Info label="Unpaid / absent days" value={payslip.absentDays} />
               </div>
+              {payslip.leaveConflicts?.length > 0 && (
+                <div className="form-error attendance-error">Attendance/leave conflict: {payslip.leaveConflicts.join("; ")}</div>
+              )}
               <div className="payslip-money">
                 <div>
                   <h3>Earnings</h3>
@@ -7363,7 +7400,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
         </div>
         {payrollNotice && <div className="payroll-notice">{payrollNotice}</div>}
 
-        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Paid leave", "Unpaid/Absent", "Gross", "Deductions", "Net payable", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
+        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Paid leave", "Unpaid/Absent", "Gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
           <Person key={`${row.key}-person`} name={row.employee.name} detail={`${row.employee.employeeId} Â· ${row.employee.dept}`} />,
           row.employee.legalEntity || "HRGP",
           `${row.applicableDays || row.workDays}/${row.workDays}`,
@@ -7373,6 +7410,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
           `INR ${row.monthlySalary.toLocaleString("en-IN")}`,
           `INR ${row.deductions.toLocaleString("en-IN")}`,
           `INR ${row.netPay.toLocaleString("en-IN")}`,
+          row.leaveConflicts?.length ? <Badge key={`${row.key}-conflicts`} tone="red">{row.leaveConflicts.length} conflict{row.leaveConflicts.length === 1 ? "" : "s"}</Badge> : "-",
           <select key={`${row.key}-status`} value={row.status} disabled={!canManage || cycleFinalized} onChange={(event) => updatePayrollStatus(row.key, event.target.value)} aria-label={`Payroll status ${row.employee.name}`}>
             <option>Draft</option>
             <option>Reviewed</option>
@@ -7546,6 +7584,10 @@ function SalarySlip({ payroll, month }) {
             <strong>- {formatMoney(payroll.deductions)}</strong>
           </div>
         </section>
+
+        {payroll.leaveConflicts?.length > 0 && (
+          <div className="form-error attendance-error">Attendance/leave conflict: {payroll.leaveConflicts.join("; ")}</div>
+        )}
 
         <SalarySection
           tone="green"

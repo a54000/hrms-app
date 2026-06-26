@@ -157,6 +157,7 @@ model User {
   approvedAttendanceLimitResetRequests AttendanceLimitResetRequest[] @relation("AttendanceLimitResetApprover")
   closedAttendanceRegularizationCases AttendanceRegularizationCase[] @relation("AttendanceRegularizationClosedBy")
   assignedSaturdayRota SaturdayRotaAssignment[] @relation("SaturdayRotaAssignedBy")
+  createdLeaveRequests LeaveRequest[]            @relation("LeaveCreator")
   approvedLeaveRequests LeaveRequest[]          @relation("LeaveApprover")
   updatedLeaveBalances EmployeeLeaveBalance[]   @relation("LeaveBalanceUpdatedBy")
   processedPayrollCycles PayrollCycle[]         @relation("PayrollProcessedBy")
@@ -333,6 +334,8 @@ model LeaveRequest {
   days        Decimal        @db.Decimal(5, 2)
   reason      String?
   status      ApprovalStatus @default(pending)
+  createdById String?        @db.Uuid
+  createdBy   User?          @relation("LeaveCreator", fields: [createdById], references: [id], onDelete: SetNull)
   approverId  String?        @db.Uuid
   approver    User?          @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull)
   approvedAt  DateTime?
