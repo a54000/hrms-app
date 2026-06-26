@@ -2068,6 +2068,7 @@ function timeMinutes(value) {
 }
 
 function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequests, onAttendance, onRequest, onLogout }) {
+  const [clockTick, setClockTick] = useState(Date.now());
   const today = todayLocalDate();
   const [dismissed, setDismissed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2081,7 +2082,13 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
   const previousOpenDate = previousOpenRecord?.date || "";
   const previousCheckoutMissing = !isAttendanceExempt && Boolean(previousOpenRecord);
   const shouldShow = !dismissed && (previousCheckoutMissing || !todayRecord?.checkIn);
-  const currentMinutes = timeMinutes(currentLocalTime());
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTick(Date.now()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const currentPromptTime = currentIstTime(new Date(clockTick));
+  const currentMinutes = timeMinutes(currentPromptTime);
   const beforeLoginWindow = currentMinutes < timeMinutes("08:30");
   const afterLoginWindow = currentMinutes >= timeMinutes("20:00");
   const outsideLoginWindow = beforeLoginWindow || afterLoginWindow;
@@ -2136,7 +2143,7 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
       requestType: "Forgot to punch",
       statusValue: "Present",
       punchType: "Check in",
-      checkIn: lateMissedCheckIn ? missedCheckInTime : currentLocalTime(),
+      checkIn: lateMissedCheckIn ? missedCheckInTime : currentPromptTime,
       checkOut: "",
       hours: "",
       reason: lateMissedCheckIn ? "Forgot to punch" : "Check in",
@@ -2249,7 +2256,7 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
           {!previousCheckoutMissing && !outsideLoginWindow && afterCutoff && (
             <label className="field">
               <span>Actual check-in time</span>
-              <input type="time" value={lateMissedCheckIn ? missedCheckInTime : currentLocalTime()} disabled={!lateMissedCheckIn} onInput={(event) => setMissedCheckInTime(event.target.value)} onChange={(event) => setMissedCheckInTime(event.target.value)} />
+              <input type="time" value={lateMissedCheckIn ? missedCheckInTime : currentPromptTime} disabled={!lateMissedCheckIn} onInput={(event) => setMissedCheckInTime(event.target.value)} onChange={(event) => setMissedCheckInTime(event.target.value)} />
             </label>
           )}
         </div>
