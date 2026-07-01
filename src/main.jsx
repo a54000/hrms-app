@@ -3335,7 +3335,7 @@ function Employees({ rows, allEmployees, setEmployees, entityOptions, query, set
 
   useEffect(() => {
     setEmployeePage(1);
-  }, [employeeEntity, sortBy, rows.length]);
+  }, [employeeEntity, query, sortBy, rows.length]);
 
   useEffect(() => {
     if (employeePage > pageCount) setEmployeePage(pageCount);
@@ -3484,6 +3484,12 @@ function Employees({ rows, allEmployees, setEmployees, entityOptions, query, set
       <div className="employee-layout full">
         <Panel title={panelTitle} meta={panelMeta}>
           <div className="toolbar">
+            {viewMode !== "allocation" && (
+              <div className="search-box">
+                <Search size={16} />
+                <input value={query} onInput={(event) => setQuery(event.target.value)} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, code, email, client, role" aria-label="Search employees" />
+              </div>
+            )}
             {viewMode !== "allocation" && <select value={employeeEntity} onChange={(event) => setEmployeeEntity(event.target.value)} aria-label="Employee entity">
               {entityOptions.map((entity) => <option key={entity}>{entity}</option>)}
             </select>}
