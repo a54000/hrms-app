@@ -127,15 +127,6 @@ function setSessionCookie(request, response, token) {
   });
 }
 
-function loginWindowError(user) {
-  if (user.role !== "employee") return null;
-  const ist = new Date(Date.now() + IST_OFFSET_MINUTES * 60000);
-  const minutes = (ist.getUTCHours() * 60) + ist.getUTCMinutes();
-  if (minutes < 510) return "Employee login opens at 8:30 AM.";
-  if (minutes >= 1200) return "Employee login is closed after 8:00 PM.";
-  return null;
-}
-
 function currentIstMonth() {
   const ist = new Date(Date.now() + IST_OFFSET_MINUTES * 60000);
   return `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -305,8 +296,6 @@ router.post("/login", async (request, response, next) => {
     const user = await findActiveUserByLogin(parsed.data.login || parsed.data.email);
     const passwordOk = user ? await bcrypt.compare(parsed.data.password, user.passwordHash) : false;
     if (!passwordOk) throw httpError(401, "Invalid username/email or password.");
-    const windowMessage = loginWindowError(user);
-    if (windowMessage) throw httpError(403, windowMessage);
     const limitBlock = await attendanceLimitBlock(user);
     if (limitBlock) {
       response.status(403).json({
@@ -350,8 +339,6 @@ router.post("/google", async (request, response, next) => {
     if (!payload?.email || payload.email_verified === false) throw httpError(401, "Google account email is not verified.");
 
     const user = await findGoogleUser(payload.email);
-    const windowMessage = loginWindowError(user);
-    if (windowMessage) throw httpError(403, windowMessage);
     const limitBlock = await attendanceLimitBlock(user);
     if (limitBlock) {
       response.status(403).json({

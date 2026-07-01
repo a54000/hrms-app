@@ -414,24 +414,24 @@ async function upsertAttendance(input, userId) {
   return record;
 }
 
-async function applyAttendanceLeaveDeduction(employee, date, minutes, userId) {
+export async function applyAttendanceLeaveDeduction(employee, date, minutes, userId, db = prisma) {
   if (minutes === null || minutes <= 0 || minutes >= 360) return null;
   const attendanceDate = toDate(date);
   const days = minutes < 180 ? 1 : 0.5;
-  const reasonPrefix = days === 1 ? "Auto full-day Casual Leave" : "Auto half-day Casual Leave";
-  const existing = await prisma.leaveRequest.findFirst({
+  const autoLeaveReasonPrefix = days === 1 ? "Auto full-day Casual Leave" : "Auto half-day Casual Leave";
+  const existing = await db.leaveRequest.findFirst({
     where: {
       employeeId: employee.id,
       leaveType: "Casual Leave",
       fromDate: attendanceDate,
       toDate: attendanceDate,
-      reason: { startsWith: reasonPrefix },
+      reason: { startsWith: autoLeaveReasonPrefix },
       status: { in: ["pending", "approved"] },
     },
     select: { id: true },
   });
   if (existing) {
-    return prisma.leaveRequest.findUnique({
+    const leaveRequest = await db.leaveRequest.findUnique({
       where: { id: existing.id },
       select: {
         id: true,
@@ -445,15 +445,34 @@ async function applyAttendanceLeaveDeduction(employee, date, minutes, userId) {
         employee: { select: { employeeCode: true, fullName: true } },
       },
     });
+    const leaveBalance = await db.employeeLeaveBalance.upsert({
+      where: { employeeId_leaveType: { employeeId: employee.id, leaveType: "Casual Leave" } },
+      update: { balance: { decrement: days }, source: "auto_deduction", updatedById: userId },
+      create: { employeeId: employee.id, leaveType: "Casual Leave", balance: -days, source: "auto_deduction", updatedById: userId },
+    });
+    await db.leaveBalanceTransaction.create({
+      data: {
+        employeeId: employee.id,
+        leaveType: "Casual Leave",
+        transactionDate: attendanceDate,
+        amount: -days,
+        balanceAfter: Number(leaveBalance.balance || 0),
+        sourceType: "auto_deduction",
+        sourceId: leaveRequest.id,
+        notes: `${autoLeaveReasonPrefix} for attendance on ${toDateString(attendanceDate)}; deduction created from ${minutes} minutes worked`,
+        createdById: userId,
+      },
+    });
+    return leaveRequest;
   }
-  return prisma.leaveRequest.create({
+  const leaveRequest = await db.leaveRequest.create({
     data: {
       employeeId: employee.id,
       leaveType: "Casual Leave",
       fromDate: attendanceDate,
       toDate: attendanceDate,
       days,
-      reason: `${reasonPrefix}: worked ${days === 1 ? "less than 3 hours" : "less than 6 hours"} (${minutes} minutes)`,
+      reason: `${autoLeaveReasonPrefix}: worked ${days === 1 ? "less than 3 hours" : "less than 6 hours"} (${minutes} minutes)`,
       status: "approved",
       approverId: userId,
       approvedAt: new Date(),
@@ -470,6 +489,25 @@ async function applyAttendanceLeaveDeduction(employee, date, minutes, userId) {
       employee: { select: { employeeCode: true, fullName: true } },
     },
   });
+  const leaveBalance = await db.employeeLeaveBalance.upsert({
+    where: { employeeId_leaveType: { employeeId: employee.id, leaveType: "Casual Leave" } },
+    update: { balance: { decrement: days }, source: "auto_deduction", updatedById: userId },
+    create: { employeeId: employee.id, leaveType: "Casual Leave", balance: -days, source: "auto_deduction", updatedById: userId },
+  });
+  await db.leaveBalanceTransaction.create({
+    data: {
+      employeeId: employee.id,
+      leaveType: "Casual Leave",
+      transactionDate: attendanceDate,
+      amount: -days,
+      balanceAfter: Number(leaveBalance.balance || 0),
+      sourceType: "auto_deduction",
+      sourceId: leaveRequest.id,
+      notes: `${autoLeaveReasonPrefix} for attendance on ${toDateString(attendanceDate)}; deduction created from ${minutes} minutes worked`,
+      createdById: userId,
+    },
+  });
+  return leaveRequest;
 }
 
 async function upsertAttendanceWithDeduction(input, userId) {

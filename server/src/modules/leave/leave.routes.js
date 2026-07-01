@@ -291,6 +291,33 @@ async function leaveAvailable(employee, type, excludeRequestId = null) {
   return Math.max(baseBalance - used - pending, 0);
 }
 
+export async function recordManualLeaveBalanceAdjustment(tx, employeeId, leaveType, balance, updatedById, notes = "") {
+  const targetBalance = balanceNumber(balance);
+  const existing = await tx.employeeLeaveBalance.findUnique({
+    where: { employeeId_leaveType: { employeeId, leaveType } },
+    select: { balance: true },
+  });
+  const updatedBalanceRow = await tx.employeeLeaveBalance.upsert({
+    where: { employeeId_leaveType: { employeeId, leaveType } },
+    update: { balance: targetBalance, source: "manual", updatedById },
+    create: { employeeId, leaveType, balance: targetBalance, source: "manual", updatedById },
+  });
+  await tx.leaveBalanceTransaction.create({
+    data: {
+      employeeId,
+      leaveType,
+      transactionDate: new Date(),
+      amount: targetBalance - Number(existing?.balance || 0),
+      balanceAfter: Number(updatedBalanceRow.balance || 0),
+      sourceType: "manual_adjustment",
+      sourceId: updatedBalanceRow.id,
+      notes: notes || `Manual leave balance adjusted to ${targetBalance} for ${leaveType}`,
+      createdById: updatedById,
+    },
+  });
+  return updatedBalanceRow;
+}
+
 function duplicateLeaveWhere(employeeId, leaveType, fromDate, toDateValue, excludeId = null, statuses = ["pending", "approved"]) {
   return {
     employeeId,
@@ -424,11 +451,7 @@ router.put("/balances", requireRole("admin", "hr"), async (request, response, ne
           ["Compensatory Off", row.compOffBalance],
         ].filter(([, value]) => value !== undefined && value !== null);
         for (const [leaveType, value] of updates) {
-          await tx.employeeLeaveBalance.upsert({
-            where: { employeeId_leaveType: { employeeId: employee.id, leaveType } },
-            update: { balance: balanceNumber(value), source: "manual", updatedById: request.user.id },
-            create: { employeeId: employee.id, leaveType, balance: balanceNumber(value), source: "manual", updatedById: request.user.id },
-          });
+          await recordManualLeaveBalanceAdjustment(tx, employee.id, leaveType, value, request.user.id, `Manual balance updated from Leave Settings for ${row.employeeCode}`);
         }
       }
     });

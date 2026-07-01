@@ -39,17 +39,6 @@ export async function requireAuth(request, response, next) {
       return response.status(401).json({ error: { message: "Unauthenticated", status: 401 } });
     }
 
-    if (user.role === "employee" && !payload.impersonatedBy) {
-      const now = new Date();
-      const minutes = (now.getHours() * 60) + now.getMinutes();
-      if (minutes < 510) {
-        return response.status(403).json({ error: { message: "Employee login opens at 8:30 AM.", status: 403 } });
-      }
-      if (minutes >= 1200) {
-        return response.status(403).json({ error: { message: "Employee login is closed after 8:00 PM.", status: 403 } });
-      }
-    }
-
     user.impersonatedBy = payload.impersonatedBy || null;
     request.user = user;
     next();

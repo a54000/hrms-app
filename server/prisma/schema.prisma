@@ -51,6 +51,22 @@ enum PayrollStatus {
   paid
 }
 
+enum ReconciliationExceptionType {
+  leave_approved_but_no_balance_reduction
+  balance_reduced_without_leave_approval
+  leave_applied_on_non_working_day
+  attendance_present_on_approved_leave_day
+  unpaid_leave_counted_as_paid
+  negative_balance
+  leave_days_mismatch_calendar
+}
+
+enum ReconciliationStatus {
+  draft
+  reviewed
+  locked
+}
+
 enum CandidateStage {
   screening
   interview
@@ -126,6 +142,9 @@ model Employee {
   saturdayRotaAssignments SaturdayRotaAssignment[]
   leaveRequests     LeaveRequest[]
   leaveBalances     EmployeeLeaveBalance[]
+  leaveBalanceTransactions LeaveBalanceTransaction[] @relation("LeaveBalanceTransactionEmployee")
+  payrollReconciliations PayrollReconciliation[] @relation("PayrollReconciliationEmployee")
+  reconciliationExceptions ReconciliationException[] @relation("ReconciliationExceptionEmployee")
   payslips          Payslip[]
   convertedCandidates RecruitmentCandidate[] @relation("ConvertedEmployee")
   performanceReviews PerformanceReview[] @relation("ReviewedEmployee")
@@ -160,11 +179,13 @@ model User {
   createdLeaveRequests LeaveRequest[]            @relation("LeaveCreator")
   approvedLeaveRequests LeaveRequest[]          @relation("LeaveApprover")
   updatedLeaveBalances EmployeeLeaveBalance[]   @relation("LeaveBalanceUpdatedBy")
+  createdLeaveBalanceTransactions LeaveBalanceTransaction[] @relation("LeaveBalanceTransactionCreatedBy")
   processedPayrollCycles PayrollCycle[]         @relation("PayrollProcessedBy")
   ownedCandidates     RecruitmentCandidate[]    @relation("CandidateOwner")
   auditLogs           AuditLog[]
   approvedLoginDevices LoginDevice[]           @relation("LoginDeviceApprovedBy")
   loginEvents         LoginEvent[]
+  resolvedReconciliationExceptions ReconciliationException[] @relation("ReconciliationExceptionResolvedBy")
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 }
@@ -362,6 +383,68 @@ model EmployeeLeaveBalance {
   @@index([leaveType])
 }
 
+model LeaveBalanceTransaction {
+  id             String   @id @default(uuid()) @db.Uuid
+  employeeId     String   @db.Uuid
+  employee       Employee @relation("LeaveBalanceTransactionEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType      String
+  transactionDate DateTime @db.Date
+  amount         Decimal  @db.Decimal(8, 2)
+  balanceAfter   Decimal  @db.Decimal(8, 2)
+  sourceType     String
+  sourceId       String?  @db.Uuid
+  notes          String?
+  createdById    String?  @db.Uuid
+  createdBy      User?    @relation("LeaveBalanceTransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  @@index([employeeId, leaveType])
+  @@index([transactionDate])
+  @@index([sourceType, sourceId])
+}
+
+model PayrollReconciliation {
+  id             String               @id @default(uuid()) @db.Uuid
+  payrollCycleId  String              @db.Uuid
+  payrollCycle    PayrollCycle        @relation(fields: [payrollCycleId], references: [id], onDelete: Cascade)
+  employeeId      String              @db.Uuid
+  employee        Employee            @relation("PayrollReconciliationEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  month           DateTime            @db.Date
+  workDays        Decimal             @db.Decimal(6, 2)
+  presentDays     Decimal             @db.Decimal(6, 2)
+  paidLeaveDays   Decimal             @db.Decimal(6, 2)
+  unpaidLeaveDays Decimal             @db.Decimal(6, 2)
+  absentDays      Decimal             @db.Decimal(6, 2)
+  balanceConsumed Decimal             @db.Decimal(8, 2)
+  balanceRemaining Decimal            @db.Decimal(8, 2)
+  status          ReconciliationStatus @default(draft)
+  exceptions      ReconciliationException[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([payrollCycleId, employeeId, month])
+  @@index([employeeId, month])
+}
+
+model ReconciliationException {
+  id                     String                     @id @default(uuid()) @db.Uuid
+  payrollReconciliationId String                     @db.Uuid
+  payrollReconciliation   PayrollReconciliation      @relation(fields: [payrollReconciliationId], references: [id], onDelete: Cascade)
+  employeeId             String                     @db.Uuid
+  employee               Employee                   @relation("ReconciliationExceptionEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  date                   DateTime?                  @db.Date
+  exceptionType          ReconciliationExceptionType
+  severity               String
+  details                Json
+  resolvedAt             DateTime?
+  resolvedById           String?                    @db.Uuid
+  resolvedBy             User?                      @relation("ReconciliationExceptionResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt              DateTime                   @default(now())
+
+  @@index([payrollReconciliationId, exceptionType])
+  @@index([employeeId, date])
+}
+
 model Holiday {
   id          String   @id @default(uuid()) @db.Uuid
   holidayDate DateTime @db.Date
@@ -387,6 +470,7 @@ model PayrollCycle {
   processedBy User?         @relation("PayrollProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
   processedAt DateTime?
   payslips    Payslip[]
+  payrollReconciliations PayrollReconciliation[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

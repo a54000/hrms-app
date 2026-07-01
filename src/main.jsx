@@ -5902,7 +5902,7 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
           <div className="attendance-actions">
             <div>
               <strong>Today</strong>
-              <span>{isAttendanceExempt ? "Attendance timing restrictions are not applied to your role." : `Check in is allowed from 8:30 AM${allowAfterCutoff ? " with admin after-cutoff override enabled" : " to 10:30 AM"}. Check out is available after check in and closes at 8:30 PM. Requests used this month: ${monthlyRequestCount(ownEmployee.employeeId)}/5.`}</span>
+              <span>{isAttendanceExempt ? "Attendance timing restrictions are not applied to your role." : `Login is always available. Check in is allowed from 8:30 AM${allowAfterCutoff ? " with admin after-cutoff override enabled" : " to 10:30 AM"}. Check out is available after check in and closes at 8:30 PM. Requests used this month: ${monthlyRequestCount(ownEmployee.employeeId)}/5.`}</span>
               {previousCheckoutMissing && (
                 <span className="attendance-warning-text">
                   Check-in is blocked because checkout is missing for {previousOpenDate}. Open Select request and choose Missed checkout to regularize that date first.
@@ -6147,7 +6147,7 @@ function AttendanceRulesModal({ onClose }) {
           <button className="icon-btn" onClick={onClose} aria-label="Close attendance rules"><X size={18} /></button>
         </div>
         <div className="policy-list">
-          <Info label="Login window" value="HRMS login is available from 8:30 AM to 8:00 PM on approved laptop/device only." wide />
+          <Info label="Login" value="HRMS login is available any time on approved laptop/device only." wide />
           <Info label="Check-in" value="Check in as soon as work starts. Direct check-in is allowed till 10:30 AM." wide />
           <Info label="Checkout" value="After check-in, use Check out at the end of the workday. Missing checkout may block next day check-in." wide />
           <Info label="Missed / late punch" value="After 10:30 AM, raise Missed / Late check-in and select the correct reason, such as Running late. If checkout is missed, raise Missed checkout." wide />
@@ -8234,6 +8234,9 @@ function groupRows(counts) {
 function Reports({ employees, leaveRecords, attendanceRecords, setAttendanceRecords, payrollStatus }) {
   const [reportMonth, setReportMonth] = useState(currentPayrollMonth());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [leaveReport, setLeaveReport] = useState({ loading: false, error: "", data: null });
+  const [leaveSearch, setLeaveSearch] = useState("");
+  const [leaveSort, setLeaveSort] = useState({ field: "employeeName", direction: "asc" });
   const payrollRows = employees.map((employee) => payrollForEmployee(employee, reportMonth, attendanceRecords, leaveRecords, payrollStatus));
   const attendanceSummaryRows = employees.map((employee) => attendanceSummaryForEmployee(employee, reportMonth, attendanceRecords, leaveRecords));
   const headcountByDept = groupRows(countBy(employees, (employee) => employee.dept));
@@ -8242,6 +8245,80 @@ function Reports({ employees, leaveRecords, attendanceRecords, setAttendanceReco
   const attendanceStatus = groupRows(countBy(attendanceRecords, (record) => record.status));
   const payrollStatusRows = groupRows(countBy(payrollRows, (row) => row.status));
   const selectedEmployee = employees.find((employee) => employee.employeeId === selectedEmployeeId);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLeaveReport() {
+      setLeaveReport((current) => ({ ...current, loading: true, error: "" }));
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/reports/leaves?month=${reportMonth}`, { credentials: "include", headers: authHeaders() });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error?.message || "Could not load leave report.");
+        if (!cancelled) {
+          setLeaveReport({ loading: false, error: "", data: data.report || null });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLeaveReport({ loading: false, error: error.message || "Could not load leave report.", data: null });
+        }
+      }
+    }
+    loadLeaveReport();
+    return () => { cancelled = true; };
+  }, [reportMonth]);
+
+  const leaveRows = useMemo(() => {
+    const rows = leaveReport.data?.rows || [];
+    const query = leaveSearch.trim().toLowerCase();
+    const filtered = query ? rows.filter((row) => row.employeeName.toLowerCase().includes(query) || row.employeeId.toLowerCase().includes(query)) : rows;
+    const sorted = [...filtered].sort((left, right) => {
+      const direction = leaveSort.direction === "asc" ? 1 : -1;
+      if (leaveSort.field === "paidLeaveDays") return (Number(left.paidLeaveDays) - Number(right.paidLeaveDays)) * direction || left.employeeName.localeCompare(right.employeeName) * direction;
+      if (leaveSort.field === "leaveDays") return (Number(left.totalLeaveDays) - Number(right.totalLeaveDays)) * direction || left.employeeName.localeCompare(right.employeeName) * direction;
+      return left.employeeName.localeCompare(right.employeeName) * direction || left.employeeId.localeCompare(right.employeeId) * direction;
+    });
+    return sorted;
+  }, [leaveReport.data?.rows, leaveSearch, leaveSort]);
+
+  const leaveCsvRows = useMemo(() => {
+    return leaveRows.map((row) => ({
+      employeeName: row.employeeName,
+      employeeCode: row.employeeId,
+      paidLeaveDays: row.paidLeaveDays,
+      unpaidLeaveDays: row.unpaidLeaveDays,
+      totalLeaveDays: row.totalLeaveDays,
+      currentBalanceTotal: row.currentBalanceTotal,
+      monthEndBalanceRemaining: row.monthEndBalanceRemaining ?? "",
+      leaveBreakdown: row.leaveDaysByType.map((item) => `${item.leaveType}: ${item.days}`).join(" | "),
+      balanceRemainingBreakdown: row.currentBalancesByType.map((item) => `${item.leaveType}: ${item.balance}`).join(" | "),
+    }));
+  }, [leaveRows]);
+
+  function exportLeaveCsv() {
+    const header = [
+      "Employee Name",
+      "Employee Code",
+      "Paid Leave Days",
+      "Unpaid Leave Days",
+      "Total Leave Days",
+      "Total Balance Remaining",
+      "Month-end Remaining",
+      "Leave Breakdown",
+      "Balance Remaining by Type",
+    ].map((label) => csvEscape(label)).join(",");
+    const body = leaveCsvRows.map((row) => [
+      row.employeeName,
+      row.employeeCode,
+      row.paidLeaveDays,
+      row.unpaidLeaveDays,
+      row.totalLeaveDays,
+      row.currentBalanceTotal,
+      row.monthEndBalanceRemaining,
+      row.leaveBreakdown,
+      row.balanceRemainingBreakdown,
+    ].map((value) => csvEscape(value)).join(",")).join("\n");
+    downloadCsv(`hrguru-leave-report-${reportMonth}.csv`, `${header}\n${body}`);
+  }
 
   function updateMonthlyAttendance(employee, date, field, value) {
     const current = attendanceRecords.find((record) => record.employeeId === employee.employeeId && record.date === date) ||
@@ -8261,6 +8338,41 @@ function Reports({ employees, leaveRecords, attendanceRecords, setAttendanceReco
 
   return (
     <div className="stack">
+      <Panel title="Employee Leave Report" meta={leaveReport.data?.sourceLabel || reportMonth}>
+        <div className="toolbar report-toolbar">
+          <label className="field compact-field">
+            <span>Report month</span>
+            <input type="month" value={reportMonth} onInput={(event) => setReportMonth(event.target.value)} onChange={(event) => setReportMonth(event.target.value)} />
+          </label>
+          <label className="field compact-field">
+            <span>Search employee</span>
+            <input type="search" value={leaveSearch} onInput={(event) => setLeaveSearch(event.target.value)} onChange={(event) => setLeaveSearch(event.target.value)} placeholder="Type a name or code" />
+          </label>
+          <div className="toolbar">
+            <button className={leaveSort.field === "employeeName" ? "secondary-btn" : "primary-btn"} onClick={() => setLeaveSort((current) => ({ field: "employeeName", direction: current.field === "employeeName" && current.direction === "asc" ? "desc" : "asc" }))}>Sort by name</button>
+            <button className={leaveSort.field === "leaveDays" ? "secondary-btn" : "primary-btn"} onClick={() => setLeaveSort((current) => ({ field: "leaveDays", direction: current.field === "leaveDays" && current.direction === "asc" ? "desc" : "asc" }))}>Sort by leave days</button>
+            <button className="secondary-btn" disabled={leaveReport.loading || !leaveRows.length} onClick={exportLeaveCsv}><Download size={17} /> Export CSV</button>
+          </div>
+        </div>
+        {leaveReport.loading && <div className="empty-state">Loading leave report...</div>}
+        {leaveReport.error && <div className="form-error">{leaveReport.error}</div>}
+        {leaveReport.data?.sourceMode === "live" && <div className="payroll-notice">This month has not been finalized - showing live / unreconciled data.</div>}
+        {leaveReport.data?.sourceMode === "reconciled" && <div className="form-note">Showing reconciled month-end data.</div>}
+        <DataTable
+          columns={["Employee", "Code", "Paid leave by type", "Unpaid leave", "Total balance remaining", "Balance remaining by leave type", "Month-end remaining", "Source"]}
+          rows={leaveRows.length ? leaveRows.map((row) => [
+            row.employeeName,
+            row.employeeId,
+            row.leaveDaysByType.length ? row.leaveDaysByType.map((item) => `${item.leaveType}: ${item.days}`).join(" | ") : "-",
+            row.unpaidLeaveDays,
+            row.currentBalanceTotal,
+            row.currentBalancesByType.length ? row.currentBalancesByType.map((item) => `${item.leaveType}: ${item.balance}`).join(" | ") : "-",
+            row.monthEndBalanceRemaining ?? "-",
+            row.dataSource,
+          ]) : [["No leave report data found", "-", "-", "-", "-", "-", "-", "-"]]}
+        />
+      </Panel>
+
       <Panel title="Monthly Attendance Report" meta={reportMonth}>
         <div className="toolbar report-toolbar">
           <label className="field compact-field">

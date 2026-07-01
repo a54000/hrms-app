@@ -238,11 +238,31 @@ const clients = [
 const holidays = [
   { holidayDate: "2026-01-26", name: "Republic Day", type: "National" },
   { holidayDate: "2026-03-04", name: "Holi", type: "National" },
+  { holidayDate: "2026-06-15", name: "June Audit Holiday", type: "Company" },
   { holidayDate: "2026-08-15", name: "Independence Day", type: "National" },
   { holidayDate: "2026-10-02", name: "Gandhi Jayanti", type: "National" },
   { holidayDate: "2026-11-08", name: "Diwali", type: "National" },
   { holidayDate: "2026-12-25", name: "Christmas", type: "National" },
 ];
+
+const juneCoverageFixtures = {
+  month: "2026-06",
+  holidayDates: new Set(["2026-06-15"]),
+  employeePlans: [
+    { employeeCode: "HRGP09", attendance: "mostly_present", absences: ["2026-06-11", "2026-06-24"] },
+    { employeeCode: "HRGP38", attendance: "mostly_present", paidLeave: [{ fromDate: "2026-06-08", toDate: "2026-06-08", days: 1 }] },
+    { employeeCode: "HRGP51", attendance: "mostly_present", unpaidLeave: [{ fromDate: "2026-06-12", toDate: "2026-06-13", days: 2 }] },
+    { employeeCode: "HRGP57", attendance: "mostly_present", halfDayLeave: { date: "2026-06-03", leaveType: "Casual Leave", days: 0.5 } },
+    { employeeCode: "HRGP71", attendance: "mostly_present", absences: ["2026-06-18"], paidLeave: [{ fromDate: "2026-06-22", toDate: "2026-06-23", days: 2 }] },
+    { employeeCode: "HRGP82", attendance: "mostly_present", unpaidLeave: [{ fromDate: "2026-06-09", toDate: "2026-06-09", days: 1 }] },
+    { employeeCode: "HRGP84", attendance: "mostly_present", absences: ["2026-06-17"] },
+    { employeeCode: "HRGP88", attendance: "mostly_present", paidLeave: [{ fromDate: "2026-06-11", toDate: "2026-06-12", days: 2 }] },
+    { employeeCode: "HRGPX24", attendance: "mostly_present", paidLeave: [{ fromDate: "2026-06-03", toDate: "2026-06-03", days: 0.5 }], absences: ["2026-06-19"] },
+    { employeeCode: "HRGPMID1", attendance: "mid_month_joiner", joinDate: "2026-06-16", attendanceStart: "2026-06-16", paidLeave: [{ fromDate: "2026-06-24", toDate: "2026-06-25", days: 2 }] },
+    { employeeCode: "HRGP82", leaveMismatch: { fromDate: "2026-06-25", toDate: "2026-06-28", days: 2 } },
+    { employeeCode: "HRGP88", holidaySpanLeave: { fromDate: "2026-06-14", toDate: "2026-06-16", days: 3 } },
+  ],
+};
 
 function toDate(value) {
   if (!value) return null;
@@ -252,6 +272,296 @@ function toDate(value) {
     return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
   }
   return null;
+}
+
+function monthRange(month) {
+  const start = new Date(`${month}-01T00:00:00.000Z`);
+  const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
+  return { start, end };
+}
+
+function addDays(date, days) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days));
+}
+
+function dayOfWeek(date) {
+  return date.getUTCDay();
+}
+
+function buildWorkingCalendar({ month, holidayDates = new Set(), saturdayWorkingDates = new Set() }) {
+  const { start, end } = monthRange(month);
+  const dates = [];
+  for (let current = start; current <= end; current = addDays(current, 1)) {
+    const iso = current.toISOString().slice(0, 10);
+    const saturday = dayOfWeek(current) === 6;
+    const weekend = dayOfWeek(current) === 0 || saturday;
+    const holiday = holidayDates.has(iso);
+    const saturdayRotaWorkingDay = saturday && saturdayWorkingDates.has(iso);
+    const isWorkingDay = !holiday && (!weekend || saturdayRotaWorkingDay);
+    dates.push({ date: iso, isWorkingDay, holiday, weekend, saturdayRotaWorkingDay });
+  }
+  return dates;
+}
+
+function dateSetFromRows(rows) {
+  return new Set(rows.map((row) => row.date));
+}
+
+function workingDatesForEmployee(calendar, employeePlan, saturdayWorkingDates = new Set()) {
+  if (employeePlan.attendance === "mid_month_joiner") {
+    return calendar.filter((day) => day.isWorkingDay && day.date >= employeePlan.attendanceStart);
+  }
+  return calendar.filter((day) => day.isWorkingDay);
+}
+
+function inferStatusForDate(date, plan) {
+  if (plan.halfDayLeave?.date === date) return "Half Day";
+  if (plan.absences?.includes(date)) return "Absent";
+  if (plan.paidLeave?.some((leave) => date >= leave.fromDate && date <= leave.toDate)) return "Leave";
+  if (plan.unpaidLeave?.some((leave) => date >= leave.fromDate && date <= leave.toDate)) return "Leave";
+  if (plan.leaveMismatch && date >= plan.leaveMismatch.fromDate && date <= plan.leaveMismatch.toDate) return "Leave";
+  if (plan.holidaySpanLeave && date >= plan.holidaySpanLeave.fromDate && date <= plan.holidaySpanLeave.toDate) return "Leave";
+  return "Present";
+}
+
+function attendancePayload(employee, date, status) {
+  const base = {
+    employeeId: employee.id,
+    attendanceDate: toDate(date),
+    status: status.toLowerCase() === "half day" ? "half_day" : status.toLowerCase(),
+    source: "seed",
+    remarks: "Seeded June 2026 coverage",
+  };
+  if (status === "Present") return { ...base, status: "present", durationMinutes: 510 };
+  if (status === "Absent") return { ...base, status: "absent" };
+  if (status === "Leave") return { ...base, status: "leave" };
+  return { ...base, status: "half_day", durationMinutes: 240 };
+}
+
+async function seedJune2026Coverage() {
+  const { start, end } = monthRange(juneCoverageFixtures.month);
+  const allEmployees = await prisma.employee.findMany({
+    where: { status: { in: ["active", "probation", "on_leave"] } },
+    select: { id: true, employeeCode: true, joinDate: true },
+  });
+  const midMonthJoiner = await prisma.employee.upsert({
+    where: { employeeCode_legalEntity: { employeeCode: "HRGPMID1", legalEntity: defaultEntity } },
+    update: {
+      fullName: "Mid Month Joiner",
+      email: "mid.month.joiner@hrguru.in",
+      designation: "HR Associate",
+      department: "Operations",
+      status: "active",
+      joinDate: toDate("2026-06-16"),
+      monthlySalary: moneyValue(45000),
+      workMode: "Office",
+      complianceStatus: "Seeded June coverage",
+    },
+    create: {
+      employeeCode: "HRGPMID1",
+      legalEntity: defaultEntity,
+      fullName: "Mid Month Joiner",
+      email: "mid.month.joiner@hrguru.in",
+      designation: "HR Associate",
+      department: "Operations",
+      status: "active",
+      joinDate: toDate("2026-06-16"),
+      monthlySalary: moneyValue(45000),
+      workMode: "Office",
+      complianceStatus: "Seeded June coverage",
+    },
+  });
+  const seededMidUser = await prisma.user.findUnique({ where: { email: "mid.month.joiner@hrguru.in" } });
+  if (!seededMidUser) {
+    const passwordHash = await bcrypt.hash("password123", 10);
+    await prisma.user.create({
+      data: {
+        username: "mid.month.joiner",
+        email: "mid.month.joiner@hrguru.in",
+        passwordHash,
+        role: "employee",
+        employeeId: midMonthJoiner.id,
+      },
+    });
+  }
+  const employeeByCode = new Map([...allEmployees, midMonthJoiner].map((employee) => [employee.employeeCode, employee]));
+  const calendar = buildWorkingCalendar({ month: juneCoverageFixtures.month, holidayDates: juneCoverageFixtures.holidayDates });
+
+  for (const plan of juneCoverageFixtures.employeePlans) {
+    const employee = employeeByCode.get(plan.employeeCode);
+    if (!employee) continue;
+    const workDays = workingDatesForEmployee(calendar, plan);
+    const leaveDates = new Set();
+    for (const leave of plan.paidLeave || []) {
+      const request = await prisma.leaveRequest.findFirst({
+        where: {
+          employeeId: employee.id,
+          leaveType: "Casual Leave",
+          fromDate: toDate(leave.fromDate),
+          toDate: toDate(leave.toDate),
+          status: "approved",
+        },
+      });
+      if (!request) {
+        await prisma.leaveRequest.create({
+          data: {
+            employeeId: employee.id,
+            leaveType: "Casual Leave",
+            fromDate: toDate(leave.fromDate),
+            toDate: toDate(leave.toDate),
+            days: leave.days,
+            status: "approved",
+            approverId: null,
+            approvedAt: new Date(),
+            createdById: null,
+            reason: "Seeded paid leave coverage",
+          },
+        });
+      }
+      for (let current = toDate(leave.fromDate); current <= toDate(leave.toDate); current = addDays(current, 1)) {
+        leaveDates.add(current.toISOString().slice(0, 10));
+      }
+    }
+    for (const leave of plan.unpaidLeave || []) {
+      const request = await prisma.leaveRequest.findFirst({
+        where: {
+          employeeId: employee.id,
+          leaveType: "Unpaid Leave",
+          fromDate: toDate(leave.fromDate),
+          toDate: toDate(leave.toDate),
+          status: "approved",
+        },
+      });
+      if (!request) {
+        await prisma.leaveRequest.create({
+          data: {
+            employeeId: employee.id,
+            leaveType: "Unpaid Leave",
+            fromDate: toDate(leave.fromDate),
+            toDate: toDate(leave.toDate),
+            days: leave.days,
+            status: "approved",
+            approverId: null,
+            approvedAt: new Date(),
+            createdById: null,
+            reason: "Seeded unpaid leave coverage",
+          },
+        });
+      }
+      for (let current = toDate(leave.fromDate); current <= toDate(leave.toDate); current = addDays(current, 1)) {
+        leaveDates.add(current.toISOString().slice(0, 10));
+      }
+    }
+    if (plan.halfDayLeave) {
+      const leave = plan.halfDayLeave;
+      const existing = await prisma.leaveRequest.findFirst({
+        where: {
+          employeeId: employee.id,
+          leaveType: leave.leaveType,
+          fromDate: toDate(leave.date),
+          toDate: toDate(leave.date),
+          days: 0.5,
+          status: "approved",
+        },
+      });
+      if (!existing) {
+        await prisma.leaveRequest.create({
+          data: {
+            employeeId: employee.id,
+            leaveType: leave.leaveType,
+            fromDate: toDate(leave.date),
+            toDate: toDate(leave.date),
+            days: 0.5,
+            status: "approved",
+            approverId: null,
+            approvedAt: new Date(),
+            createdById: null,
+            reason: "Seeded half-day leave coverage",
+          },
+        });
+      }
+      leaveDates.add(leave.date);
+    }
+    if (plan.leaveMismatch) {
+      const leave = plan.leaveMismatch;
+      const existing = await prisma.leaveRequest.findFirst({
+        where: {
+          employeeId: employee.id,
+          leaveType: "Casual Leave",
+          fromDate: toDate(leave.fromDate),
+          toDate: toDate(leave.toDate),
+          days: leave.days,
+          status: "approved",
+        },
+      });
+      if (!existing) {
+        await prisma.leaveRequest.create({
+          data: {
+            employeeId: employee.id,
+            leaveType: "Casual Leave",
+            fromDate: toDate(leave.fromDate),
+            toDate: toDate(leave.toDate),
+            days: leave.days,
+            status: "approved",
+            approverId: null,
+            approvedAt: new Date(),
+            createdById: null,
+            reason: "Seeded leave mismatch coverage",
+          },
+        });
+      }
+      for (let current = toDate(leave.fromDate); current <= toDate(leave.toDate); current = addDays(current, 1)) {
+        leaveDates.add(current.toISOString().slice(0, 10));
+      }
+    }
+    if (plan.holidaySpanLeave) {
+      const leave = plan.holidaySpanLeave;
+      const existing = await prisma.leaveRequest.findFirst({
+        where: {
+          employeeId: employee.id,
+          leaveType: "Casual Leave",
+          fromDate: toDate(leave.fromDate),
+          toDate: toDate(leave.toDate),
+          days: leave.days,
+          status: "approved",
+        },
+      });
+      if (!existing) {
+        await prisma.leaveRequest.create({
+          data: {
+            employeeId: employee.id,
+            leaveType: "Casual Leave",
+            fromDate: toDate(leave.fromDate),
+            toDate: toDate(leave.toDate),
+            days: leave.days,
+            status: "approved",
+            approverId: null,
+            approvedAt: new Date(),
+            createdById: null,
+            reason: "Seeded holiday spanning leave coverage",
+          },
+        });
+      }
+      for (let current = toDate(leave.fromDate); current <= toDate(leave.toDate); current = addDays(current, 1)) {
+        leaveDates.add(current.toISOString().slice(0, 10));
+      }
+    }
+    for (const date of workDays.map((row) => row.date)) {
+      const status = inferStatusForDate(date, plan);
+      const payload = attendancePayload(employee, date, status);
+      const existing = await prisma.attendanceRecord.findFirst({
+        where: { employeeId: employee.id, attendanceDate: toDate(date) },
+      });
+      if (existing) {
+        await prisma.attendanceRecord.update({
+          where: { id: existing.id },
+          data: payload,
+        });
+      } else {
+        await prisma.attendanceRecord.create({ data: payload });
+      }
+    }
+  }
 }
 
 async function main() {
@@ -451,6 +761,8 @@ async function main() {
       });
     }
   }
+
+  await seedJune2026Coverage();
 
   console.log(`Seeded ${employees.length} employees, ${users.length} users, ${clients.length} clients, and ${holidays.length} holidays.`);
 }

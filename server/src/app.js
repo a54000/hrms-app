@@ -33,6 +33,10 @@ app.get("/health", (_request, response) => {
 app.use("/api", routes);
 app.use(errorHandler);
 
-app.listen(port, () => {
-  console.log(`HR Guru HRMS server listening on port ${port}`);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  app.listen(port, () => {
+    console.log(`HR Guru HRMS server listening on port ${port}`);
+  });
+}
+
+export default app;
