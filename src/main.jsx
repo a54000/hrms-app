@@ -2229,7 +2229,7 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
       <section className="modal-card attendance-nudge-modal" role="dialog" aria-modal="true" aria-label="Check in reminder">
         <div className="modal-head">
           <div>
-            <h2>{previousCheckoutMissing ? "Checkout pending from previous workday" : outsideLoginWindow ? "Attendance window closed" : afterCutoff ? "Check-in request needed" : "Mark your check-in"}</h2>
+            <h2>{previousCheckoutMissing ? "Checkout pending from previous workday" : outsideLoginWindow ? "Check-in window closed" : afterCutoff ? "Check-in request needed" : "Mark your check-in"}</h2>
             <p>
               {previousCheckoutMissing
                 ? "You cannot check in today because your last attendance entry is still open."
@@ -2253,9 +2253,9 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
               {previousCheckoutMissing
                 ? `Why: checkout is missing for ${previousOpenDate}. Check-in was recorded at ${previousOpenRecord?.checkIn || "the saved time"}.`
                 : outsideLoginWindow
-                ? "Please contact Admin if you need attendance support outside login hours."
+                ? "Please contact Admin if you need attendance support outside access hours."
                   : lateMissedCheckIn
-                    ? "Use the time you actually started work, not the current late-evening login time."
+                    ? "Use the time you actually started work, not the current late-evening access time."
                   : afterCutoff
                     ? "Raise a Forgot to punch request to continue."
                   : "Your check-in will be recorded for today."}
@@ -3040,7 +3040,7 @@ function Dashboard({ role, profile, employees, clients, leaveRecords, leaveSetti
       { label: "Aadhaar", complete: Boolean(ownEmployee?.aadhaarNumber) },
     ];
     const noticeItems = [
-      { title: "Attendance window", detail: "Login is allowed from 8:30 AM to 8:00 PM. Direct check-in closes at 10:30 AM.", tone: "green" },
+      { title: "Check-in window", detail: "Direct check-in is available from 8:30 AM to 10:30 AM. After that, raise a check-in request.", tone: "green" },
       { title: "Request limit", detail: "Forgot to punch requests count toward the 5-request monthly limit.", tone: ownRequestCount >= 5 ? "red" : "amber" },
       { title: "Leave policy", detail: "Casual Leave can be applied only when quota is available.", tone: "blue" },
     ];
@@ -5902,7 +5902,7 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
           <div className="attendance-actions">
             <div>
               <strong>Today</strong>
-              <span>{isAttendanceExempt ? "Attendance timing restrictions are not applied to your role." : `Login is always available. Check in is allowed from 8:30 AM${allowAfterCutoff ? " with admin after-cutoff override enabled" : " to 10:30 AM"}. Check out is available after check in and closes at 8:30 PM. Requests used this month: ${monthlyRequestCount(ownEmployee.employeeId)}/5.`}</span>
+          <span>{isAttendanceExempt ? "Attendance timing restrictions are not applied to your role." : `Check in is allowed from 8:30 AM${allowAfterCutoff ? " with admin after-cutoff override enabled" : " to 10:30 AM"}. Check out is available after check in and closes at 8:30 PM. Requests used this month: ${monthlyRequestCount(ownEmployee.employeeId)}/5.`}</span>
               {previousCheckoutMissing && (
                 <span className="attendance-warning-text">
                   Check-in is blocked because checkout is missing for {previousOpenDate}. Open Select request and choose Missed checkout to regularize that date first.
@@ -6147,8 +6147,8 @@ function AttendanceRulesModal({ onClose }) {
           <button className="icon-btn" onClick={onClose} aria-label="Close attendance rules"><X size={18} /></button>
         </div>
         <div className="policy-list">
-          <Info label="Login" value="HRMS login is available any time on approved laptop/device only." wide />
           <Info label="Check-in" value="Check in as soon as work starts. Direct check-in is allowed till 10:30 AM." wide />
+          <Info label="Attendance access" value="HRMS access is available any time on approved laptop/device only." wide />
           <Info label="Checkout" value="After check-in, use Check out at the end of the workday. Missing checkout may block next day check-in." wide />
           <Info label="Missed / late punch" value="After 10:30 AM, raise Missed / Late check-in and select the correct reason, such as Running late. If checkout is missed, raise Missed checkout." wide />
           <Info label="Working from 2nd Half" value="Raise Working from 2nd Half if starting from second half." wide />
