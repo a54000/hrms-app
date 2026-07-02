@@ -2004,6 +2004,7 @@ function App() {
           attendanceRequests={attendanceRequests}
           onAttendance={mergeAttendanceRecord}
           onRequest={(request) => setAttendanceRequests((requests) => [request, ...requests])}
+          onOpenAttendance={() => setActiveModule("attendance")}
           onLogout={handleLogout}
         />
       )}
@@ -2081,7 +2082,7 @@ function timeMinutes(value) {
   return (hours * 60) + minutes;
 }
 
-function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequests, onAttendance, onRequest, onLogout }) {
+function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequests, onAttendance, onRequest, onOpenAttendance, onLogout }) {
   const [clockTick, setClockTick] = useState(Date.now());
   const today = todayLocalDate();
   const [dismissed, setDismissed] = useState(false);
@@ -2224,6 +2225,11 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
     }
   }
 
+  function openAttendancePage() {
+    setDismissed(true);
+    onOpenAttendance?.();
+  }
+
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="modal-card attendance-nudge-modal" role="dialog" aria-modal="true" aria-label="Check in reminder">
@@ -2232,7 +2238,7 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
             <h2>{previousCheckoutMissing ? "Checkout pending from previous workday" : outsideLoginWindow ? "Check-in window closed" : afterCutoff ? "Check-in request needed" : "Mark your check-in"}</h2>
             <p>
               {previousCheckoutMissing
-                ? "You cannot check in today because your last attendance entry is still open."
+                ? "You can continue into HRMS, but today's check-in is paused until the missed checkout is regularized."
                 : outsideLoginWindow
                 ? beforeLoginWindow
                   ? "Check-in is available after 8:30 AM."
@@ -2264,7 +2270,7 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
           {previousCheckoutMissing && (
             <div className="check-row">
               <AlertCircle size={17} />
-              <span>What next: click Raise checkout request, confirm the correct checkout time for {previousOpenDate}, and submit it. Once the request is saved, today&apos;s check-in will be available.</span>
+              <span>What next: raise a Forgot to punch checkout request for {previousOpenDate}. You can do it here now, or open Attendance and use Select request &gt; Missed checkout.</span>
             </div>
           )}
           {!previousCheckoutMissing && !outsideLoginWindow && afterCutoff && (
@@ -2277,9 +2283,12 @@ function PostLoginAttendancePrompt({ employee, attendanceRecords, attendanceRequ
         {error && <div className="form-error">{error}</div>}
         <div className="modal-actions">
           {previousCheckoutMissing ? (
-            <button className="primary-btn" disabled={saving} onClick={raisePreviousCheckoutRequest}>
-              {saving ? "Saving..." : `Raise checkout request for ${previousOpenDate}`}
-            </button>
+            <>
+              <button className="secondary-btn" disabled={saving} onClick={openAttendancePage}>Open Attendance</button>
+              <button className="primary-btn" disabled={saving} onClick={raisePreviousCheckoutRequest}>
+                {saving ? "Saving..." : `Raise checkout request for ${previousOpenDate}`}
+              </button>
+            </>
           ) : outsideLoginWindow ? (
             <button className="secondary-btn" onClick={onLogout}>Exit to login</button>
           ) : (

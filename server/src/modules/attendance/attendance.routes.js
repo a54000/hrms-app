@@ -577,7 +577,7 @@ router.post("/check-in", async (request, response, next) => {
       if (nowMinutes < minutesSinceMidnight("08:30")) throw httpError(400, "Check-in opens at 8:30 AM.");
       if (nowMinutes > minutesSinceMidnight("10:30")) throw httpError(400, "Check-in is allowed only till 10:30 AM. Raise a Forgot to punch request.");
       const openPrior = await latestOpenPriorAttendance(employee.id, toDate(today));
-      if (openPrior) throw httpError(400, `Checkout is pending for ${toDateString(openPrior.attendanceDate)}. Raise a Forgot to punch checkout request before today's check-in.`);
+      if (openPrior) throw httpError(400, `Today's check-in is blocked because checkout is pending for ${toDateString(openPrior.attendanceDate)}. Open Attendance and raise a Forgot to punch checkout request for that date first.`);
     }
     const record = await upsertAttendance({
       employeeCode,
