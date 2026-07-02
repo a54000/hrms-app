@@ -5823,7 +5823,6 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       setDuplicateRequestNotice(duplicatePunchMessage(requestDraft.punchType, requestDraft.date));
       return;
     }
-    const employee = employees.find((item) => item.employeeId === requestDraft.employeeId);
     const normalizedCheckIn = requestDraft.requestType === "Forgot to punch" && requestDraft.punchType === "Checkout" && !requestDraft.checkIn
       ? (attendanceRecords.find((record) => record.employeeId === requestDraft.employeeId && record.date === requestDraft.date)?.checkIn || "")
       : requestDraft.checkIn;
@@ -5849,18 +5848,6 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       status: "Approved",
       createdAt: today,
     };
-    let next = {
-      employeeId: request.employeeId,
-      employee: request.employee,
-      date: request.date,
-      status: request.statusValue,
-      checkIn: request.checkIn,
-      checkOut: request.checkOut,
-      hours: request.hours,
-      notes: `Auto-approved request: ${request.requestType}. ${request.reason}`,
-    };
-    if (employee) next = applyHoursRules(employee, next);
-    mergeAttendance(next);
     setAttendanceError("");
     try {
       const response = await fetch(`${API_BASE_URL}/api/attendance/update-requests`, {
@@ -5884,7 +5871,6 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       } else {
         setAttendanceError(message);
       }
-      setAttendanceRequests((requests) => [request, ...requests]);
       setRequestDraft(null);
     }
   }
@@ -5924,7 +5910,11 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
                 </span>
               )}
             </div>
-            {!ownTodayRecord?.checkIn && <button className="primary-btn" disabled={!attendanceDbConnected} onClick={() => markOwnAttendance("checkIn")}>Check in</button>}
+            {!ownTodayRecord?.checkIn && (
+              <button className="primary-btn" disabled={!attendanceDbConnected} onClick={() => markOwnAttendance("checkIn")}>
+                {previousCheckoutMissing ? `Raise missed checkout for ${previousOpenDate}` : "Check in"}
+              </button>
+            )}
             <button className="secondary-btn" disabled={!attendanceDbConnected || !canCheckOutNow()} title={attendanceDbConnected ? checkOutBlockMessage() : "Database not connected; attendance cannot be marked."} onClick={() => markOwnAttendance("checkOut")}>Check out</button>
             {isTodayAttendanceComplete ? (
               <span className="form-note">Good job, you&apos;re done for the day. You worked for {todayWorkedHours} hour{todayWorkedHours === 1 ? "" : "s"} today.</span>
