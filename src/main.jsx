@@ -945,8 +945,9 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
   });
   const presentDays = rows.filter((row) => ["Present", "Remote", "Late"].includes(row.status)).length;
   const halfDays = rows.filter((row) => row.status === "Half Day").length;
-  const paidLeaveDays = rows.filter((row) => row.status === "Leave" && row.leaveType !== "Unpaid Leave").reduce((sum, row) => sum + Number(row.leaveDays || 1), 0);
-  const unpaidLeaveDays = rows.filter((row) => row.status === "Leave" && row.leaveType === "Unpaid Leave").reduce((sum, row) => sum + Number(row.leaveDays || 1), 0);
+  const paidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Casual Leave") +
+    approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off");
+  const unpaidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave");
   const absentDays = rows.filter((row) => row.status === "Absent").length + unpaidLeaveDays + (halfDays * 0.5);
   const paidDays = presentDays + paidLeaveDays;
   const monthlySalary = Number(String(employee.monthlySalary || "0").replace(/[^0-9.]/g, "")) || 0;
