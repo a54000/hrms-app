@@ -9,10 +9,11 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.js",
-    "check": "node --check src/app.js && node --check src/modules/auth/auth.routes.js && node --check src/modules/communication/communication.routes.js && node --check src/modules/dashboard/dashboard.routes.js && node --check src/modules/performance/performance.routes.js && node --check src/modules/saturday-rota/saturday-rota.routes.js && node --check src/lib/mailer.js && node --check src/jobs/attendance-noncompliance-report.js && node --check src/jobs/rotate-team-passwords.js && node --check src/jobs/send-onboarding-emails.js",
+    "check": "node --check src/app.js && node --check src/modules/auth/auth.routes.js && node --check src/modules/communication/communication.routes.js && node --check src/modules/dashboard/dashboard.routes.js && node --check src/modules/performance/performance.routes.js && node --check src/modules/saturday-rota/saturday-rota.routes.js && node --check src/lib/mailer.js && node --check src/jobs/attendance-noncompliance-report.js && node --check src/jobs/rotate-team-passwords.js && node --check src/jobs/send-onboarding-emails.js && node --check scripts/generate-monthly-payroll-csv.js",
     "attendance:noncompliance": "node src/jobs/attendance-noncompliance-report.js",
     "team:rotate-passwords": "node src/jobs/rotate-team-passwords.js",
-    "team:onboarding-emails": "node src/jobs/send-onboarding-emails.js"
+    "team:onboarding-emails": "node src/jobs/send-onboarding-emails.js",
+    "payroll:csv": "node scripts/generate-monthly-payroll-csv.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.js"
