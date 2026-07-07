@@ -985,8 +985,9 @@ function approvedLeaveDaysInMonth(employeeId, month, leaveRecords, type) {
   return leaveRecords
     .filter((request) => request.employeeId === employeeId && request.status === "Approved" && (!type || request.type === type))
     .reduce((total, request) => {
-      const days = monthDates(month).filter((date) => request.fromDate <= date && request.toDate >= date).length;
-      return total + days;
+      const dates = monthDates(month).filter((date) => request.fromDate <= date && request.toDate >= date);
+      if (Number(request.days || 0) > 0 && request.fromDate >= `${month}-01` && request.toDate <= `${month}-31`) return total + Number(request.days || 0);
+      return total + dates.length;
     }, 0);
 }
 
@@ -998,6 +999,8 @@ function attendanceSummaryForEmployee(employee, month, attendanceRecords, leaveR
     present: rows.filter((row) => ["Present", "Remote"].includes(row.status)).length,
     halfDay: rows.filter((row) => row.status === "Half Day").length,
     onLeave: rows.filter((row) => row.status === "Leave").length,
+    casualLeave: approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Casual Leave"),
+    compOff: approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off"),
     unpaidLeave: approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave"),
     shiftIssues: rows.filter((row) => row.status === "Late").length,
     openRequests: leaveRecords.filter((request) => request.employeeId === employee.employeeId && request.status === "Pending").length,
@@ -1015,6 +1018,8 @@ function liveAttendanceSummaryForEmployee(employee, month, attendanceRecords, le
     late: rows.filter((row) => row.status === "Late").length,
     remote: rows.filter((row) => row.status === "Remote").length,
     onLeave: rows.filter((row) => row.status === "Leave").length,
+    casualLeave: approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Casual Leave"),
+    compOff: approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off"),
     unpaidLeave: approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave"),
     openRequests: leaveRecords.filter((request) => request.employeeId === employee.employeeId && request.status === "Pending").length,
     recordedDays: rows.length,
@@ -1029,6 +1034,8 @@ function attendanceSummaryToCsv(month, rows) {
     ["present", "Present"],
     ["halfDay", "Half Day"],
     ["onLeave", "On Leave"],
+    ["casualLeave", "Casual Leave"],
+    ["compOff", "Comp Off"],
     ["unpaidLeave", "Unpaid Leave"],
     ["shiftIssues", "Shift Issues"],
     ["openRequests", "Open Requests"],
@@ -1041,6 +1048,8 @@ function attendanceSummaryToCsv(month, rows) {
     present: row.present,
     halfDay: row.halfDay,
     onLeave: row.onLeave,
+    casualLeave: row.casualLeave,
+    compOff: row.compOff,
     unpaidLeave: row.unpaidLeave,
     shiftIssues: row.shiftIssues,
     openRequests: row.openRequests,
@@ -8492,13 +8501,15 @@ function Reports({ role, employees, leaveRecords, attendanceRecords, setAttendan
           <button className="secondary-btn" disabled={!attendanceSummaryRows.length} onClick={() => downloadCsv(`hrguru-attendance-${reportMonth}.csv`, attendanceSummaryToCsv(reportMonth, attendanceSummaryRows))}><Download size={17} /> Download CSV</button>
         </div>
         <DataTable
-          columns={["Emp ID", "Employee Name", "Present", "Half Day", "On Leave", "Unpaid Leave", "Shift Issues", "Open Requests", "No Data"]}
+          columns={["Emp ID", "Employee Name", "Present", "Half Day", "On Leave", "Casual Leave", "Comp Off", "Unpaid Leave", "Shift Issues", "Open Requests", "No Data"]}
           rows={attendanceSummaryRows.map((row) => [
             <button className="link-button" onClick={() => setSelectedEmployeeId(row.employee.employeeId)}>{row.employee.employeeId}</button>,
             row.employee.name,
             row.present,
             row.halfDay,
             row.onLeave,
+            row.casualLeave,
+            row.compOff,
             row.unpaidLeave,
             row.shiftIssues,
             row.openRequests,
