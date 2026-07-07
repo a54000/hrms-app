@@ -50,7 +50,7 @@ const modules = [
 
 const rolePermissions = {
   admin: { hiddenModules: ["my-profile"], canManageEmployees: true, canApproveLeave: true, canManagePayroll: true, canManageAttendance: true, canManageClients: true, canManageRota: true },
-  hr: { hiddenModules: ["my-profile"], canManageEmployees: true, canApproveLeave: true, canManagePayroll: true, canManageAttendance: true, canManageClients: true, canManageRota: true },
+  hr: { hiddenModules: ["my-profile", "reports"], canManageEmployees: true, canApproveLeave: true, canManagePayroll: true, canManageAttendance: true, canManageClients: true, canManageRota: true },
   manager: { hiddenModules: ["my-profile", "client-management", "communication", "recruitment", "reports", "settings"], canManageEmployees: false, canApproveLeave: true, canManagePayroll: false, canManageAttendance: false, canManageClients: false, canManageRota: true },
   employee: { hiddenModules: ["client-management", "employees", "communication", "recruitment", "reports", "settings"], canManageEmployees: false, canApproveLeave: false, canManagePayroll: false, canManageAttendance: true, canManageClients: false, canManageRota: false },
 };
@@ -1492,6 +1492,7 @@ function App() {
   }, [sessionUser]);
 
   useEffect(() => {
+    if (role !== "admin") return undefined;
     let cancelled = false;
     if (!sessionUser) {
       setLeaveRecords([]);
@@ -1970,7 +1971,7 @@ function App() {
         {activeModule === "communication" && <Communication />}
         {activeModule === "recruitment" && <Recruitment candidates={candidateRecords} setCandidates={setCandidateRecords} employees={employeeRecords} setEmployees={setEmployeeRecords} />}
         {activeModule === "performance" && <Performance role={role} profile={profile} employees={employeeRecords} reviews={performanceReviews} setReviews={setPerformanceReviews} />}
-        {activeModule === "reports" && <Reports employees={employeeRecords} leaveRecords={leaveRecords} attendanceRecords={attendanceRecords} setAttendanceRecords={setAttendanceRecords} payrollStatus={payrollStatus} />}
+        {activeModule === "reports" && <Reports role={role} employees={employeeRecords} leaveRecords={leaveRecords} attendanceRecords={attendanceRecords} setAttendanceRecords={setAttendanceRecords} payrollStatus={payrollStatus} />}
         {activeModule === "settings" && <SettingsModule profile={profile} />}
       </main>
       {profileModalOpen && <MyProfileModal profile={profile} onClose={() => setProfileModalOpen(false)} />}
@@ -8236,10 +8237,11 @@ function groupRows(counts) {
   return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
 }
 
-function Reports({ employees, leaveRecords, attendanceRecords, setAttendanceRecords, payrollStatus }) {
+function Reports({ role, employees, leaveRecords, attendanceRecords, setAttendanceRecords, payrollStatus }) {
   const [reportMonth, setReportMonth] = useState(currentPayrollMonth());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [leaveReport, setLeaveReport] = useState({ loading: false, error: "", data: null });
+  const [leavePayrollReport, setLeavePayrollReport] = useState({ loading: false, error: "", data: null });
   const [leaveSearch, setLeaveSearch] = useState("");
   const [leaveSort, setLeaveSort] = useState({ field: "employeeName", direction: "asc" });
   const payrollRows = employees.map((employee) => payrollForEmployee(employee, reportMonth, attendanceRecords, leaveRecords, payrollStatus));
@@ -8270,7 +8272,29 @@ function Reports({ employees, leaveRecords, attendanceRecords, setAttendanceReco
     }
     loadLeaveReport();
     return () => { cancelled = true; };
-  }, [reportMonth]);
+  }, [reportMonth, role]);
+
+  useEffect(() => {
+    if (role !== "admin") return undefined;
+    let cancelled = false;
+    async function loadLeavePayrollReport() {
+      setLeavePayrollReport((current) => ({ ...current, loading: true, error: "" }));
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/reports/leave-payroll?month=${reportMonth}`, { credentials: "include", headers: authHeaders() });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error?.message || "Could not load monthly leave payroll report.");
+        if (!cancelled) {
+          setLeavePayrollReport({ loading: false, error: "", data: data.report || null });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLeavePayrollReport({ loading: false, error: error.message || "Could not load monthly leave payroll report.", data: null });
+        }
+      }
+    }
+    loadLeavePayrollReport();
+    return () => { cancelled = true; };
+  }, [reportMonth, role]);
 
   const leaveRows = useMemo(() => {
     const rows = leaveReport.data?.rows || [];
@@ -8325,6 +8349,46 @@ function Reports({ employees, leaveRecords, attendanceRecords, setAttendanceReco
     downloadCsv(`hrguru-leave-report-${reportMonth}.csv`, `${header}\n${body}`);
   }
 
+  const leavePayrollRows = leavePayrollReport.data?.rows || [];
+
+  function exportLeavePayrollCsv() {
+    const header = [
+      "Month",
+      "Entity",
+      "Employee Code",
+      "Employee Name",
+      "Email",
+      "Department",
+      "Designation",
+      "Client",
+      "Status",
+      "Casual Leave",
+      "Comp Off",
+      "Work From Home",
+      "Unpaid Leave",
+      "Total Leave Days",
+      "Details",
+    ].map((label) => csvEscape(label)).join(",");
+    const body = leavePayrollRows.map((row) => [
+      row.month,
+      row.entity,
+      row.employeeId,
+      row.employeeName,
+      row.email,
+      row.department,
+      row.designation,
+      row.client,
+      row.status,
+      row.casualLeave,
+      row.compOff,
+      row.workFromHome,
+      row.unpaidLeave,
+      row.totalLeaveDays,
+      row.details,
+    ].map((value) => csvEscape(value)).join(",")).join("\n");
+    downloadCsv(`hrguru-leave-payroll-${reportMonth}.csv`, `${header}\n${body}`);
+  }
+
   function updateMonthlyAttendance(employee, date, field, value) {
     const current = attendanceRecords.find((record) => record.employeeId === employee.employeeId && record.date === date) ||
       defaultAttendanceFor(employee, date, leaveRecords);
@@ -8341,8 +8405,43 @@ function Reports({ employees, leaveRecords, attendanceRecords, setAttendanceReco
     });
   }
 
+  if (role !== "admin") {
+    return (
+      <div className="stack">
+        <div className="empty-state">Reports are available only to admin users.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="stack">
+      <Panel title="Monthly Leave Payroll Report" meta={leavePayrollReport.data?.sourceLabel || reportMonth}>
+        <div className="toolbar report-toolbar">
+          <label className="field compact-field">
+            <span>Report month</span>
+            <input type="month" value={reportMonth} onInput={(event) => setReportMonth(event.target.value)} onChange={(event) => setReportMonth(event.target.value)} />
+          </label>
+          <button className="secondary-btn" disabled={leavePayrollReport.loading || !leavePayrollRows.length} onClick={exportLeavePayrollCsv}><Download size={17} /> Export CSV</button>
+        </div>
+        {leavePayrollReport.loading && <div className="empty-state">Loading monthly leave payroll report...</div>}
+        {leavePayrollReport.error && <div className="form-error">{leavePayrollReport.error}</div>}
+        <DataTable
+          columns={["Employee", "Code", "Entity", "Client", "Casual", "Comp Off", "WFH", "Unpaid", "Total", "Details"]}
+          rows={leavePayrollRows.length ? leavePayrollRows.map((row) => [
+            row.employeeName,
+            row.employeeId,
+            row.entity,
+            row.client || "-",
+            row.casualLeave,
+            row.compOff,
+            row.workFromHome,
+            row.unpaidLeave,
+            row.totalLeaveDays,
+            row.details || "-",
+          ]) : [["No leave payroll data found", "-", "-", "-", "-", "-", "-", "-", "-", "-"]]}
+        />
+      </Panel>
+
       <Panel title="Employee Leave Report" meta={leaveReport.data?.sourceLabel || reportMonth}>
         <div className="toolbar report-toolbar">
           <label className="field compact-field">

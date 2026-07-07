@@ -18,7 +18,9 @@ function leaveDaysWithinMonth(request, start, end) {
   const spanDays = daysBetween(request.fromDate, request.toDate);
   if (requestedDays > 0 && request.fromDate >= start && request.toDate <= end) return requestedDays;
   if (requestedDays > 0 && spanDays === 1) return requestedDays;
-  return daysBetween(from, to);
+  const overlapDays = daysBetween(from, to);
+  if (requestedDays > 0 && spanDays > 0) return Number(((requestedDays / spanDays) * overlapDays).toFixed(2));
+  return overlapDays;
 }
 
 function sumBy(rows, iteratee) {
@@ -177,6 +179,86 @@ export async function buildLeaveReport(month, db = prisma) {
       finalized: source.finalized,
     },
     leaveTypes,
+    rows,
+  };
+}
+
+export async function buildLeavePayrollReport(month, db = prisma) {
+  const { start, end } = monthRange(month);
+  const leaveTypes = ["Casual Leave", "Compensatory Off", "Work From Home", "Unpaid Leave"];
+  const employees = await db.employee.findMany({
+    where: {
+      joinDate: { lte: end },
+      OR: [{ exitDate: null }, { exitDate: { gte: start } }],
+    },
+    select: {
+      id: true,
+      employeeCode: true,
+      fullName: true,
+      email: true,
+      legalEntity: true,
+      department: true,
+      designation: true,
+      client: true,
+      status: true,
+    },
+    orderBy: [{ legalEntity: "asc" }, { employeeCode: "asc" }],
+  });
+  const employeeIds = employees.map((employee) => employee.id);
+  const leaveRequests = await db.leaveRequest.findMany({
+    where: {
+      employeeId: { in: employeeIds },
+      status: "approved",
+      fromDate: { lte: end },
+      toDate: { gte: start },
+    },
+    select: { employeeId: true, leaveType: true, fromDate: true, toDate: true, days: true, reason: true },
+    orderBy: [{ employeeId: "asc" }, { fromDate: "asc" }],
+  });
+
+  const leaveRequestsByEmployee = new Map();
+  for (const request of leaveRequests) {
+    const current = leaveRequestsByEmployee.get(request.employeeId) || [];
+    current.push(request);
+    leaveRequestsByEmployee.set(request.employeeId, current);
+  }
+
+  const rows = employees.map((employee) => {
+    const totals = Object.fromEntries(leaveTypes.map((type) => [type, 0]));
+    const details = [];
+    const employeeLeaves = leaveRequestsByEmployee.get(employee.id) || [];
+
+    for (const request of employeeLeaves) {
+      const days = leaveDaysWithinMonth(request, start, end);
+      if (!days) continue;
+      totals[request.leaveType] = Number(((totals[request.leaveType] || 0) + days).toFixed(2));
+      details.push(`${request.fromDate.toISOString().slice(0, 10)} to ${request.toDate.toISOString().slice(0, 10)} - ${request.leaveType} (${days})${request.reason ? ` - ${request.reason}` : ""}`);
+    }
+
+    const totalLeaveDays = leaveTypes.reduce((sum, type) => sum + Number(totals[type] || 0), 0);
+    return {
+      month,
+      entity: employee.legalEntity || "HRGP",
+      employeeId: employee.employeeCode,
+      employeeName: employee.fullName,
+      email: employee.email,
+      department: employee.department,
+      designation: employee.designation,
+      client: employee.client || "",
+      status: employee.status,
+      casualLeave: totals["Casual Leave"] || 0,
+      compOff: totals["Compensatory Off"] || 0,
+      workFromHome: totals["Work From Home"] || 0,
+      unpaidLeave: totals["Unpaid Leave"] || 0,
+      totalLeaveDays: Number(totalLeaveDays.toFixed(2)),
+      details: details.join("; "),
+    };
+  });
+
+  return {
+    month,
+    sourceMode: "live",
+    sourceLabel: `Monthly leave payroll report - ${month}`,
     rows,
   };
 }
