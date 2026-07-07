@@ -911,6 +911,15 @@ function payrollApplicableDates(employee, month) {
   return dates.filter((date) => date >= joinDate && date <= exitDate);
 }
 
+function isEmployeeApplicableForPayrollMonth(employee, month) {
+  const dates = monthDates(month);
+  const monthStart = dates[0];
+  const monthEnd = dates[dates.length - 1];
+  const joinDate = employee.joinDate || monthStart;
+  const exitDate = employee.exitDate || monthEnd;
+  return joinDate <= monthEnd && exitDate >= monthStart;
+}
+
 function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, payrollStatus) {
   const dates = monthDates(month);
   const applicableDates = payrollApplicableDates(employee, month);
@@ -7132,15 +7141,41 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
   const [bulkPayslipsOpen, setBulkPayslipsOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [payrollNotice, setPayrollNotice] = useState("");
+  const [payrollAttendanceRecords, setPayrollAttendanceRecords] = useState([]);
+  const [payrollAttendanceStatus, setPayrollAttendanceStatus] = useState("Not loaded");
   const entityOptions = ["All", ...Array.from(new Set(employees.map((employee) => employee.legalEntity || "HRGP"))).sort()];
   const cycleKey = `${selectedMonth}:${selectedEntity}`;
   const currentCycle = selectedEntity === "All" ? null : payrollCycles[cycleKey];
   const cycleFinalized = currentCycle?.finalized;
   const scopedEmployees = employees.filter((employee) => {
     if (role === "employee" || role === "manager") return employee.name === profile.name;
-    return selectedEntity === "All" || (employee.legalEntity || "HRGP") === selectedEntity;
+    return isEmployeeApplicableForPayrollMonth(employee, selectedMonth) && (selectedEntity === "All" || (employee.legalEntity || "HRGP") === selectedEntity);
   });
-  const payrollRows = scopedEmployees.map((employee) => payrollForEmployee(employee, selectedMonth, attendanceRecords, leaveRecords, payrollStatus));
+  const selectedMonthAttendanceRecords = payrollAttendanceStatus === "Database connected" ? payrollAttendanceRecords : attendanceRecords;
+  const payrollRows = scopedEmployees.map((employee) => payrollForEmployee(employee, selectedMonth, selectedMonthAttendanceRecords, leaveRecords, payrollStatus));
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedMonth) return undefined;
+    setPayrollAttendanceStatus("Loading attendance...");
+    fetch(`${API_BASE_URL}/api/attendance?month=${selectedMonth}`, { credentials: "include", cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error?.message || "Unable to load payroll attendance.");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setPayrollAttendanceRecords(data.attendance || []);
+        setPayrollAttendanceStatus("Database connected");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPayrollAttendanceRecords([]);
+        setPayrollAttendanceStatus("Attendance unavailable");
+      });
+    return () => { cancelled = true; };
+  }, [selectedMonth]);
 
   useEffect(() => {
     if (selectedEntity === "All") return;
@@ -7425,6 +7460,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
           {canManage && <button className="secondary-btn" disabled={!payrollRows.length} onClick={exportPayroll}><Download size={17} /> Export Payroll CSV</button>}
         </div>
         {payrollNotice && <div className="payroll-notice">{payrollNotice}</div>}
+        <div className="form-note">Attendance source for payroll: {payrollAttendanceStatus}</div>
 
         <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Paid leave", "Unpaid/Absent", "Prorated gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
           <Person key={`${row.key}-person`} name={row.employee.name} detail={`${row.employee.employeeId} Â· ${row.employee.dept}`} />,
