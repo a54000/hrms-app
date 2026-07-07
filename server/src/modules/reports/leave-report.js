@@ -60,6 +60,18 @@ function balanceRowsByType(balanceRows) {
 }
 
 async function reportSourceMode(db, month, employeeIds, start, end) {
+  if (!db.payrollReconciliation) {
+    return {
+      mode: "live",
+      label: "Live / unreconciled data",
+      complete: false,
+      finalized: false,
+      latestReconciliationUpdate: null,
+      latestSourceUpdate: null,
+      reconciliationRows: [],
+    };
+  }
+
   const [reconciliationRows, attendanceMax, leaveMax, balanceMax, employeeCount] = await Promise.all([
     db.payrollReconciliation.findMany({
       where: { month: start, employeeId: { in: employeeIds } },
