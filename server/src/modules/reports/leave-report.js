@@ -1,5 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 
+const manualBalanceCutoffDate = new Date("2026-05-29T00:00:00.000Z");
+
 function monthRange(month) {
   const start = new Date(`${month}-01T00:00:00.000Z`);
   const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
@@ -21,6 +23,11 @@ function leaveDaysWithinMonth(request, start, end) {
   const overlapDays = daysBetween(from, to);
   if (requestedDays > 0 && spanDays > 0) return Number(((requestedDays / spanDays) * overlapDays).toFixed(2));
   return overlapDays;
+}
+
+function isLeaveAfterManualBalanceCutoff(request) {
+  const referenceDate = request.createdAt || request.fromDate;
+  return !referenceDate || referenceDate > manualBalanceCutoffDate;
 }
 
 function sumBy(rows, iteratee) {
@@ -185,6 +192,7 @@ export async function buildLeaveReport(month, db = prisma) {
 
 export async function buildLeavePayrollReport(month, db = prisma) {
   const { start, end } = monthRange(month);
+  const leaveYearStart = new Date(`${start.getUTCMonth() >= 3 ? start.getUTCFullYear() : start.getUTCFullYear() - 1}-04-01T00:00:00.000Z`);
   const leaveTypes = ["Casual Leave", "Compensatory Off", "Work From Home", "Unpaid Leave"];
   const employees = await db.employee.findMany({
     where: {
@@ -205,22 +213,45 @@ export async function buildLeavePayrollReport(month, db = prisma) {
     orderBy: [{ legalEntity: "asc" }, { employeeCode: "asc" }],
   });
   const employeeIds = employees.map((employee) => employee.id);
-  const leaveRequests = await db.leaveRequest.findMany({
-    where: {
-      employeeId: { in: employeeIds },
-      status: "approved",
-      fromDate: { lte: end },
-      toDate: { gte: start },
-    },
-    select: { employeeId: true, leaveType: true, fromDate: true, toDate: true, days: true, reason: true },
-    orderBy: [{ employeeId: "asc" }, { fromDate: "asc" }],
-  });
+  const [leaveRequests, balanceRows, balanceLeaveRequests] = await Promise.all([
+    db.leaveRequest.findMany({
+      where: {
+        employeeId: { in: employeeIds },
+        status: "approved",
+        fromDate: { lte: end },
+        toDate: { gte: start },
+      },
+      select: { employeeId: true, leaveType: true, fromDate: true, toDate: true, days: true, reason: true, createdAt: true },
+      orderBy: [{ employeeId: "asc" }, { fromDate: "asc" }],
+    }),
+    db.employeeLeaveBalance.findMany({
+      where: { employeeId: { in: employeeIds }, leaveType: "Casual Leave" },
+      select: { employeeId: true, balance: true },
+    }),
+    db.leaveRequest.findMany({
+      where: {
+        employeeId: { in: employeeIds },
+        leaveType: "Casual Leave",
+        status: "approved",
+        fromDate: { lte: end },
+        toDate: { gte: leaveYearStart },
+      },
+      select: { employeeId: true, fromDate: true, toDate: true, days: true, createdAt: true },
+    }),
+  ]);
 
   const leaveRequestsByEmployee = new Map();
   for (const request of leaveRequests) {
     const current = leaveRequestsByEmployee.get(request.employeeId) || [];
     current.push(request);
     leaveRequestsByEmployee.set(request.employeeId, current);
+  }
+  const balanceByEmployee = new Map(balanceRows.map((row) => [row.employeeId, Number(row.balance || 0)]));
+  const casualLeaveUsedForBalanceByEmployee = new Map();
+  for (const request of balanceLeaveRequests) {
+    if (!isLeaveAfterManualBalanceCutoff(request)) continue;
+    const days = leaveDaysWithinMonth(request, leaveYearStart, end);
+    casualLeaveUsedForBalanceByEmployee.set(request.employeeId, Number(((casualLeaveUsedForBalanceByEmployee.get(request.employeeId) || 0) + days).toFixed(2)));
   }
 
   const rows = employees.map((employee) => {
@@ -236,6 +267,9 @@ export async function buildLeavePayrollReport(month, db = prisma) {
     }
 
     const totalLeaveDays = leaveTypes.reduce((sum, type) => sum + Number(totals[type] || 0), 0);
+    const casualLeaveOpeningBalance = balanceByEmployee.get(employee.id);
+    const casualLeaveUsedForBalance = casualLeaveUsedForBalanceByEmployee.get(employee.id) || 0;
+    const casualLeaveBalanceRemaining = casualLeaveOpeningBalance === undefined ? "" : Number((casualLeaveOpeningBalance - casualLeaveUsedForBalance).toFixed(2));
     return {
       month,
       entity: employee.legalEntity || "HRGP",
@@ -247,6 +281,7 @@ export async function buildLeavePayrollReport(month, db = prisma) {
       client: employee.client || "",
       status: employee.status,
       casualLeave: totals["Casual Leave"] || 0,
+      casualLeaveBalanceRemaining,
       compOff: totals["Compensatory Off"] || 0,
       workFromHome: totals["Work From Home"] || 0,
       unpaidLeave: totals["Unpaid Leave"] || 0,

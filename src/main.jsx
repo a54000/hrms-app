@@ -719,7 +719,10 @@ function leaveBalanceRows(employeeId, records, settings = defaultLeaveSettings, 
   const hasManualCasualBalance = Object.prototype.hasOwnProperty.call(settings.casualLeaveBalances || {}, employeeId);
   const manualCasualAvailable = leaveBalanceValue(settings.casualLeaveBalances?.[employeeId]);
   const compOffEntitlement = leaveBalanceValue(settings.compOffBalances?.[employeeId]);
-  const paidLeaveEntitlement = hasManualCasualBalance ? paidLeaveUsed + paidLeavePending + manualCasualAvailable : casualEarned + casualCarry;
+  const manualCasualRecords = hasManualCasualBalance ? records.filter((request) => isLeaveCreatedAfterImportCutoff(request)) : records;
+  const manualPaidLeaveUsed = paidLeaveTypes.reduce((sum, type) => sum + usedLeaveDays(employeeId, manualCasualRecords, type, start, end, ["Approved"]), 0);
+  const manualPaidLeavePending = paidLeaveTypes.reduce((sum, type) => sum + usedLeaveDays(employeeId, manualCasualRecords, type, start, end, ["Pending"]), 0);
+  const paidLeaveEntitlement = hasManualCasualBalance ? manualCasualAvailable : casualEarned + casualCarry;
   const entitlements = {
     ...fixedLeaveEntitlements,
     "Casual Leave": paidLeaveEntitlement,
@@ -727,8 +730,8 @@ function leaveBalanceRows(employeeId, records, settings = defaultLeaveSettings, 
   };
   return leaveTypes.map((type) => {
     const entitlement = Number(entitlements[type] || 0);
-    const used = paidLeaveTypes.includes(type) ? paidLeaveUsed : usedLeaveDays(employeeId, records, type, start, end, ["Approved"]);
-    const pending = paidLeaveTypes.includes(type) ? paidLeavePending : usedLeaveDays(employeeId, records, type, start, end, ["Pending"]);
+    const used = paidLeaveTypes.includes(type) ? (hasManualCasualBalance ? manualPaidLeaveUsed : paidLeaveUsed) : usedLeaveDays(employeeId, records, type, start, end, ["Approved"]);
+    const pending = paidLeaveTypes.includes(type) ? (hasManualCasualBalance ? manualPaidLeavePending : paidLeavePending) : usedLeaveDays(employeeId, records, type, start, end, ["Pending"]);
     const rawAvailable = entitlement - used - pending;
     const available = type === "Unpaid Leave" ? 999 : type === "Casual Leave" && hasManualCasualBalance ? rawAvailable : Math.max(rawAvailable, 0);
     return { type, entitlement, used, pending, available, carryForward: paidLeaveTypes.includes(type) ? casualCarry : 0, bucket: paidLeaveTypes.includes(type) ? "Paid Leave" : type };
@@ -8363,6 +8366,7 @@ function Reports({ role, employees, leaveRecords, attendanceRecords, setAttendan
       "Client",
       "Status",
       "Casual Leave",
+      "CL Balance Remaining",
       "Comp Off",
       "Work From Home",
       "Unpaid Leave",
@@ -8380,6 +8384,7 @@ function Reports({ role, employees, leaveRecords, attendanceRecords, setAttendan
       row.client,
       row.status,
       row.casualLeave,
+      row.casualLeaveBalanceRemaining,
       row.compOff,
       row.workFromHome,
       row.unpaidLeave,
@@ -8426,19 +8431,20 @@ function Reports({ role, employees, leaveRecords, attendanceRecords, setAttendan
         {leavePayrollReport.loading && <div className="empty-state">Loading monthly leave payroll report...</div>}
         {leavePayrollReport.error && <div className="form-error">{leavePayrollReport.error}</div>}
         <DataTable
-          columns={["Employee", "Code", "Entity", "Client", "Casual", "Comp Off", "WFH", "Unpaid", "Total", "Details"]}
+          columns={["Employee", "Code", "Entity", "Client", "CL Taken", "CL Balance", "Comp Off", "WFH", "Unpaid", "Total", "Details"]}
           rows={leavePayrollRows.length ? leavePayrollRows.map((row) => [
             row.employeeName,
             row.employeeId,
             row.entity,
             row.client || "-",
             row.casualLeave,
+            row.casualLeaveBalanceRemaining === "" || row.casualLeaveBalanceRemaining === null || row.casualLeaveBalanceRemaining === undefined ? "-" : row.casualLeaveBalanceRemaining,
             row.compOff,
             row.workFromHome,
             row.unpaidLeave,
             row.totalLeaveDays,
             row.details || "-",
-          ]) : [["No leave payroll data found", "-", "-", "-", "-", "-", "-", "-", "-", "-"]]}
+          ]) : [["No leave payroll data found", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"]]}
         />
       </Panel>
 

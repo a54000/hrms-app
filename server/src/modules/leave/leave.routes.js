@@ -13,6 +13,7 @@ const leaveEntitlements = {
   "Unpaid Leave": 0,
 };
 const paidLeaveTypes = ["Casual Leave"];
+const manualBalanceCutoffDate = new Date("2026-05-29T00:00:00.000Z");
 
 const approvalLabelMap = {
   pending: "Pending",
@@ -103,6 +104,11 @@ function leaveDaysWithinRange(request, start, end) {
   const fromDate = request.fromDate < start ? start : request.fromDate;
   const toDateValue = request.toDate > end ? end : request.toDate;
   return dayCount(toDateString(fromDate), toDateString(toDateValue));
+}
+
+function isLeaveAfterManualBalanceCutoff(request) {
+  const referenceDate = request.createdAt || request.fromDate;
+  return !referenceDate || referenceDate > manualBalanceCutoffDate;
 }
 
 function balanceNumber(value) {
@@ -224,7 +230,7 @@ async function balanceRows(employeeCode) {
   const { start, end } = leaveYearRange();
   const records = await prisma.leaveRequest.findMany({
     where: { employeeId: employee.id },
-    select: { leaveType: true, status: true, fromDate: true, toDate: true, days: true },
+    select: { leaveType: true, status: true, fromDate: true, toDate: true, days: true, createdAt: true },
   });
   return Object.entries(leaveEntitlements).map(([type, entitlement]) => {
     const manualBalance = manualBalances.get(`${employee.id}:${type}`);
@@ -232,10 +238,11 @@ async function balanceRows(employeeCode) {
     const relevant = paidLeaveTypes.includes(type)
       ? records.filter((request) => paidLeaveTypes.includes(request.leaveType))
       : records.filter((request) => request.leaveType === type);
-    const used = relevant.filter((request) => request.status === "approved").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
-    const pending = relevant.filter((request) => request.status === "pending").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
+    const balanceRelevant = hasManualBalance && type === "Casual Leave" ? relevant.filter(isLeaveAfterManualBalanceCutoff) : relevant;
+    const used = balanceRelevant.filter((request) => request.status === "approved").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
+    const pending = balanceRelevant.filter((request) => request.status === "pending").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
     const effectiveEntitlement = hasManualBalance
-      ? used + pending + manualBalance
+      ? manualBalance
       : type === "Casual Leave" ? casualLeaveEntitlement(employee) : entitlement;
     const rawAvailable = effectiveEntitlement - used - pending;
     return {
@@ -256,10 +263,11 @@ function calculateBalanceRowsForEmployee(employee, records, manualBalances) {
     const relevant = paidLeaveTypes.includes(type)
       ? records.filter((request) => paidLeaveTypes.includes(request.leaveType))
       : records.filter((request) => request.leaveType === type);
-    const used = relevant.filter((request) => request.status === "approved").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
-    const pending = relevant.filter((request) => request.status === "pending").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
+    const balanceRelevant = hasManualBalance && type === "Casual Leave" ? relevant.filter(isLeaveAfterManualBalanceCutoff) : relevant;
+    const used = balanceRelevant.filter((request) => request.status === "approved").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
+    const pending = balanceRelevant.filter((request) => request.status === "pending").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
     const effectiveEntitlement = hasManualBalance
-      ? used + pending + manualBalance
+      ? manualBalance
       : type === "Casual Leave" ? casualLeaveEntitlement(employee) : entitlement;
     const rawAvailable = effectiveEntitlement - used - pending;
     return {
@@ -278,14 +286,15 @@ async function leaveAvailable(employee, type, excludeRequestId = null) {
   const { start, end } = leaveYearRange();
   const records = await prisma.leaveRequest.findMany({
     where: { employeeId: employee.id, ...(excludeRequestId ? { id: { not: excludeRequestId } } : {}) },
-    select: { leaveType: true, status: true, fromDate: true, toDate: true, days: true },
+    select: { leaveType: true, status: true, fromDate: true, toDate: true, days: true, createdAt: true },
   });
   const relevant = paidLeaveTypes.includes(type)
     ? records.filter((request) => paidLeaveTypes.includes(request.leaveType))
     : records.filter((request) => request.leaveType === type);
   const entitlement = type === "Casual Leave" ? casualLeaveEntitlement(employee) : leaveEntitlements[type] ?? 0;
-  const used = relevant.filter((request) => request.status === "approved").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
-  const pending = relevant.filter((request) => request.status === "pending").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
+  const balanceRelevant = manualBalance !== undefined && type === "Casual Leave" ? relevant.filter(isLeaveAfterManualBalanceCutoff) : relevant;
+  const used = balanceRelevant.filter((request) => request.status === "approved").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
+  const pending = balanceRelevant.filter((request) => request.status === "pending").reduce((sum, request) => sum + leaveDaysWithinRange(request, start, end), 0);
   if (type === "Unpaid Leave") return 999;
   const baseBalance = manualBalance !== undefined ? manualBalance : entitlement;
   return Math.max(baseBalance - used - pending, 0);
@@ -409,7 +418,7 @@ router.get("/balances", requireRole("admin", "hr"), async (_request, response, n
     const manualBalances = await manualBalanceMap(employees.map((employee) => employee.id));
     const leaveRequests = await prisma.leaveRequest.findMany({
       where: { employeeId: { in: employees.map((employee) => employee.id) } },
-      select: { employeeId: true, leaveType: true, status: true, fromDate: true, toDate: true, days: true },
+      select: { employeeId: true, leaveType: true, status: true, fromDate: true, toDate: true, days: true, createdAt: true },
     });
     const requestsByEmployee = new Map();
     leaveRequests.forEach((leaveRequest) => {
