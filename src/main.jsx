@@ -949,11 +949,12 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
     approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off");
   const unpaidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave");
   const absentDays = rows.filter((row) => row.status === "Absent").length + unpaidLeaveDays + (halfDays * 0.5);
-  const paidDays = presentDays + paidLeaveDays;
-  const monthlySalary = Number(String(employee.monthlySalary || "0").replace(/[^0-9.]/g, "")) || 0;
-  const perDay = dates.length ? monthlySalary / dates.length : 0;
+  const fullMonthlySalary = Number(String(employee.monthlySalary || "0").replace(/[^0-9.]/g, "")) || 0;
+  const perDay = dates.length ? fullMonthlySalary / dates.length : 0;
+  const proratedGrossPay = Math.round(perDay * applicableDates.length);
   const deductions = Math.round(absentDays * perDay);
-  const netPay = Math.max(Math.round(monthlySalary - deductions), 0);
+  const netPay = Math.max(Math.round(proratedGrossPay - deductions), 0);
+  const paidDays = Math.max(Number((applicableDates.length - absentDays).toFixed(2)), 0);
   const key = `${month}:${employee.employeeId}:${employee.legalEntity || "HRGP"}`;
   const leaveConflicts = rows.filter((row) => row.leaveConflict).map((row) => `${row.date}: ${row.leaveType}`);
   return {
@@ -967,7 +968,9 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
     unpaidLeaveDays,
     absentDays,
     paidDays,
-    monthlySalary,
+    monthlySalary: proratedGrossPay,
+    fullMonthlySalary,
+    perDay,
     deductions,
     netPay,
     leaveConflicts,
@@ -1070,10 +1073,12 @@ function payrollRowsToCsv(month, rows) {
     ["department", "Department"],
     ["designation", "Designation"],
     ["workDays", "Work Days"],
+    ["applicableDays", "Applicable Days"],
     ["presentDays", "Present Days"],
     ["paidLeaveDays", "Paid Leave Days"],
     ["absentDays", "Absent Days"],
-    ["gross", "Gross Salary"],
+    ["fullMonthlySalary", "Full Monthly Salary"],
+    ["gross", "Prorated Gross Salary"],
     ["deductions", "Deductions"],
     ["netPay", "Net Payable"],
     ["leaveConflicts", "Attendance/Leave Conflicts"],
@@ -1092,9 +1097,11 @@ function payrollRowsToCsv(month, rows) {
     department: row.employee.dept,
     designation: row.employee.role,
     workDays: row.workDays,
+    applicableDays: row.applicableDays,
     presentDays: row.presentDays,
     paidLeaveDays: row.paidLeaveDays,
     absentDays: row.absentDays,
+    fullMonthlySalary: row.fullMonthlySalary,
     gross: row.monthlySalary,
     deductions: row.deductions,
     netPay: row.netPay,
@@ -7366,7 +7373,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
               <div className="payslip-money">
                 <div>
                   <h3>Earnings</h3>
-                  <div className="money-row"><span>Monthly gross salary</span><strong>INR {payslip.monthlySalary.toLocaleString("en-IN")}</strong></div>
+                  <div className="money-row"><span>Prorated gross salary</span><strong>INR {payslip.monthlySalary.toLocaleString("en-IN")}</strong></div>
                 </div>
                 <div>
                   <h3>Deductions</h3>
@@ -7419,7 +7426,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
         </div>
         {payrollNotice && <div className="payroll-notice">{payrollNotice}</div>}
 
-        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Paid leave", "Unpaid/Absent", "Gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
+        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Paid leave", "Unpaid/Absent", "Prorated gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
           <Person key={`${row.key}-person`} name={row.employee.name} detail={`${row.employee.employeeId} Â· ${row.employee.dept}`} />,
           row.employee.legalEntity || "HRGP",
           `${row.applicableDays || row.workDays}/${row.workDays}`,
@@ -7484,7 +7491,7 @@ function PayrollReviewModal({ month, rows, cleanCount, issueCount, onClose, onMa
         </div>
 
         <div className="import-table">
-          <DataTable columns={["Employee", "Entity", "Payable period", "Gross", "Deductions", "Net", "Current status", "Review", "Issues"]} rows={rows.map((row) => [
+          <DataTable columns={["Employee", "Entity", "Payable period", "Prorated gross", "Deductions", "Net", "Current status", "Review", "Issues"]} rows={rows.map((row) => [
             <Person key={`${row.key}-review-person`} name={row.employee.name} detail={row.employee.employeeId} />,
             row.employee.legalEntity || "HRGP",
             `${row.applicableDays || row.workDays}/${row.workDays}`,
