@@ -894,7 +894,7 @@ router.patch("/regularize-day", requireRole("admin", "hr"), async (request, resp
     const employee = await findEmployee(parsed.data.employeeCode);
     const attendanceDate = toDate(parsed.data.date);
     const checkIn = parsed.data.checkIn || "09:30";
-    const checkOut = parsed.data.checkOut || "";
+    const checkOut = parsed.data.checkOut || "18:30";
     assertValidAttendanceTimes(checkIn, checkOut);
     const duration = durationMinutes(checkIn, checkOut, parsed.data.hours);
     const attendance = await prisma.attendanceRecord.upsert({

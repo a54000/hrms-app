@@ -5797,8 +5797,8 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
   async function regularizeAttendanceDay(employee, row) {
     if (!employee) return;
     const checkIn = row.checkIn || "09:30";
-    const checkOut = row.checkOut || "";
-    const hours = checkOut ? String(hoursBetween(checkIn, checkOut) || row.hours || "") : "";
+    const checkOut = row.checkOut || "18:30";
+    const hours = String(hoursBetween(checkIn, checkOut) || row.hours || "9");
     setAttendanceError("");
     try {
       const response = await fetch(`${API_BASE_URL}/api/attendance/regularize-day`, {
@@ -5811,7 +5811,7 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
           checkIn,
           checkOut,
           hours,
-          notes: "Admin regularized attendance; auto CL not applicable",
+          notes: `Admin regularized attendance to full day: ${checkIn} to ${checkOut}`,
         }),
       });
       const data = await response.json().catch(() => ({}));
