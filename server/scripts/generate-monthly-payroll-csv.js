@@ -96,6 +96,11 @@ function isNonWorkingDay(dateString) {
   return day === 0 || day === 6;
 }
 
+function localDateString(date = new Date()) {
+  const ist = new Date(date.getTime() + 330 * 60000);
+  return `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, "0")}-${String(ist.getUTCDate()).padStart(2, "0")}`;
+}
+
 function employeeActiveInMonth(employee, monthStart, monthEnd) {
   const joinDate = employee.joinDate || monthStart;
   const exitDate = employee.exitDate || monthEnd;
@@ -160,6 +165,7 @@ function rowsToCsv(rows) {
 
 async function buildPayrollRows({ month, entity }) {
   const dates = monthDates(month);
+  const today = localDateString();
   const monthStart = new Date(`${dates[0]}T00:00:00.000Z`);
   const monthEnd = new Date(`${dates[dates.length - 1]}T00:00:00.000Z`);
   const employeeWhere = {
@@ -252,7 +258,7 @@ async function buildPayrollRows({ month, entity }) {
         if (leaveOnDate && ["present", "remote", "late", "half_day"].includes(attendance.status)) {
           conflicts.push(`${date}: ${label} attendance with approved ${leaveOnDate.leaveType}`);
         }
-      } else if (!leaveOnDate && !isNonWorkingDay(date)) {
+      } else if (!leaveOnDate && !isNonWorkingDay(date) && date <= today) {
         absentOnlyDays += 1;
       }
     }
