@@ -967,11 +967,23 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
   const compOffDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off");
   const paidLeaveDays = casualLeaveDays + compOffDays;
   const unpaidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave");
+  const unpaidLeaveDetails = approvedLeavesInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave").map((request) => leaveDetailText(request));
   const halfDayDeductionDays = rows
     .filter((row) => row.status === "Half Day")
     .reduce((total, row) => total + Math.max(0, 0.5 - Math.min(0.5, paidLeaveCoverageForDate(employee.employeeId, row.date, leaveRecords))), 0);
-  const absentOnlyDays = rows.filter((row) => row.status === "Absent").length;
+  const absentRows = rows.filter((row) => row.status === "Absent");
+  const absentOnlyDays = absentRows.length;
   const deductibleDays = Number((absentOnlyDays + unpaidLeaveDays + halfDayDeductionDays).toFixed(2));
+  const halfDayDeductionDetails = rows
+    .filter((row) => row.status === "Half Day")
+    .map((row) => ({ date: row.date, uncovered: Math.max(0, 0.5 - Math.min(0.5, paidLeaveCoverageForDate(employee.employeeId, row.date, leaveRecords))) }))
+    .filter((row) => row.uncovered > 0)
+    .map((row) => `${row.date} (${row.uncovered} day)`);
+  const deductibleDetails = [
+    unpaidLeaveDetails.length ? `Unpaid leave: ${unpaidLeaveDetails.join(", ")}` : "",
+    absentRows.length ? `Absent/missing attendance: ${absentRows.map((row) => row.date).join(", ")}` : "",
+    halfDayDeductionDetails.length ? `Uncovered half-day: ${halfDayDeductionDetails.join(", ")}` : "",
+  ].filter(Boolean).join(" | ");
   const fullMonthlySalary = Number(String(employee.monthlySalary || "0").replace(/[^0-9.]/g, "")) || 0;
   const perDay = dates.length ? fullMonthlySalary / dates.length : 0;
   const proratedGrossPay = Math.round(perDay * applicableDates.length);
@@ -994,6 +1006,7 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
     absentOnlyDays,
     halfDayDeductionDays,
     deductibleDays,
+    deductibleDetails,
     absentDays: deductibleDays,
     paidDays,
     monthlySalary: proratedGrossPay,
@@ -1037,6 +1050,22 @@ function paidLeaveCoverageForDate(employeeId, date, leaveRecords) {
       const perDay = Number(request.days || 0) > 0 && coveredDates.length ? Number(request.days || 0) / coveredDates.length : 1;
       return total + perDay;
     }, 0);
+}
+
+function approvedLeavesInMonth(employeeId, month, leaveRecords, type) {
+  return leaveRecords.filter((request) => (
+    request.employeeId === employeeId &&
+    request.status === "Approved" &&
+    (!type || request.type === type) &&
+    request.fromDate <= `${month}-31` &&
+    request.toDate >= `${month}-01`
+  ));
+}
+
+function leaveDetailText(request) {
+  const range = formatDateRange(request.fromDate, request.toDate);
+  const days = Number(request.days || 0);
+  return `${range} (${days || 1} day${days === 1 ? "" : "s"})`;
 }
 
 function attendanceSummaryForEmployee(employee, month, attendanceRecords, leaveRecords) {
@@ -1129,6 +1158,7 @@ function payrollRowsToCsv(month, rows) {
     ["gross", "Prorated Gross Salary"],
     ["deductions", "Deductions"],
     ["netPay", "Net Payable"],
+    ["deductibleDetails", "Deduction Details"],
     ["leaveConflicts", "Attendance/Leave Conflicts"],
     ["status", "Payroll Status"],
     ["pan", "PAN"],
@@ -1157,6 +1187,7 @@ function payrollRowsToCsv(month, rows) {
     gross: row.monthlySalary,
     deductions: row.deductions,
     netPay: row.netPay,
+    deductibleDetails: row.deductibleDetails,
     leaveConflicts: row.leaveConflicts?.join("; ") || "",
     status: row.status,
     pan: row.employee.pan,
@@ -7481,6 +7512,9 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
               {payslip.leaveConflicts?.length > 0 && (
                 <div className="form-error attendance-error">Attendance/leave conflict: {payslip.leaveConflicts.join("; ")}</div>
               )}
+              {payslip.deductibleDetails && (
+                <div className="form-note">Deduction details: {payslip.deductibleDetails}</div>
+              )}
               <div className="payslip-money">
                 <div>
                   <h3>Earnings</h3>
@@ -7538,7 +7572,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
         {payrollNotice && <div className="payroll-notice">{payrollNotice}</div>}
         <div className="form-note">Attendance source for payroll: {payrollAttendanceStatus}</div>
 
-        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Casual Leave", "Comp Off", "Unpaid Leave", "Absent/Missing", "Deductible Days", "Prorated gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
+        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Casual Leave", "Comp Off", "Unpaid Leave", "Absent/Missing", "Deductible Days", "Deduction Details", "Prorated gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
           <Person key={`${row.key}-person`} name={row.employee.name} detail={`${row.employee.employeeId} Â· ${row.employee.dept}`} />,
           row.employee.legalEntity || "HRGP",
           `${row.applicableDays || row.workDays}/${row.workDays}`,
@@ -7548,6 +7582,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
           row.unpaidLeaveDays,
           row.absentOnlyDays,
           row.deductibleDays,
+          row.deductibleDetails || "-",
           `INR ${row.monthlySalary.toLocaleString("en-IN")}`,
           `INR ${row.deductions.toLocaleString("en-IN")}`,
           `INR ${row.netPay.toLocaleString("en-IN")}`,
