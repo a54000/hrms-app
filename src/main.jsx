@@ -1521,7 +1521,7 @@ function App() {
   }, [sessionUser]);
 
   useEffect(() => {
-    if (role !== "admin") return undefined;
+    if (!["admin", "hr"].includes(role)) return undefined;
     let cancelled = false;
     if (!sessionUser) {
       setLeaveRecords([]);
@@ -1551,7 +1551,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [sessionUser]);
+  }, [role, sessionUser]);
 
   useEffect(() => {
     let cancelled = false;
