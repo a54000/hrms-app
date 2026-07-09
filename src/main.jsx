@@ -870,6 +870,15 @@ function previousPayrollMonth() {
   return shiftMonth(currentPayrollMonth(), -1);
 }
 
+function latestSelfServicePayrollMonth() {
+  return previousPayrollMonth();
+}
+
+function clampSelfServicePayrollMonth(month) {
+  const latest = latestSelfServicePayrollMonth();
+  return month && month < latest ? month : latest;
+}
+
 function previousCalendarMonthIst() {
   const istNow = new Date(Date.now() + 330 * 60000);
   return shiftMonth(istNow.toISOString().slice(0, 7), -1);
@@ -7135,7 +7144,8 @@ function NationalHolidayCalendar({ holidays, canManage, onCreate, onArchive }) {
 }
 
 function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, payrollStatus, setPayrollStatus, payrollCycles, setPayrollCycles, canManage }) {
-  const [selectedMonth, setSelectedMonth] = useState(() => (role === "employee" || role === "manager") ? previousPayrollMonth() : currentPayrollMonth());
+  const isSelfServicePayroll = role === "employee" || role === "manager";
+  const [selectedMonth, setSelectedMonth] = useState(() => isSelfServicePayroll ? latestSelfServicePayrollMonth() : currentPayrollMonth());
   const [selectedEntity, setSelectedEntity] = useState("All");
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [bulkPayslipsOpen, setBulkPayslipsOpen] = useState(false);
@@ -7153,6 +7163,16 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
   });
   const selectedMonthAttendanceRecords = payrollAttendanceStatus === "Database connected" ? payrollAttendanceRecords : attendanceRecords;
   const payrollRows = scopedEmployees.map((employee) => payrollForEmployee(employee, selectedMonth, selectedMonthAttendanceRecords, leaveRecords, payrollStatus));
+
+  function updateSelectedPayrollMonth(month) {
+    setSelectedMonth(isSelfServicePayroll ? clampSelfServicePayrollMonth(month) : month);
+  }
+
+  useEffect(() => {
+    if (isSelfServicePayroll) {
+      setSelectedMonth((month) => clampSelfServicePayrollMonth(month));
+    }
+  }, [isSelfServicePayroll]);
 
   useEffect(() => {
     let cancelled = false;
@@ -7379,7 +7399,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
           <div className="toolbar">
             <label className="field compact-field">
               <span>Payroll month</span>
-              <input type="month" value={selectedMonth} onInput={(event) => setSelectedMonth(event.target.value)} onChange={(event) => setSelectedMonth(event.target.value)} />
+              <input type="month" value={selectedMonth} max={latestSelfServicePayrollMonth()} onInput={(event) => updateSelectedPayrollMonth(event.target.value)} onChange={(event) => updateSelectedPayrollMonth(event.target.value)} />
             </label>
             <label className="field compact-field">
               <span>Entity</span>
@@ -7442,7 +7462,7 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
         <div className="toolbar">
           <label className="field compact-field">
             <span>Payroll month</span>
-            <input type="month" value={selectedMonth} onInput={(event) => setSelectedMonth(event.target.value)} onChange={(event) => setSelectedMonth(event.target.value)} />
+            <input type="month" value={selectedMonth} onInput={(event) => updateSelectedPayrollMonth(event.target.value)} onChange={(event) => updateSelectedPayrollMonth(event.target.value)} />
           </label>
           <label className="field compact-field">
             <span>Entity</span>
