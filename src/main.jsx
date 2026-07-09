@@ -966,7 +966,10 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
   const paidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Casual Leave") +
     approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off");
   const unpaidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave");
-  const absentDays = rows.filter((row) => row.status === "Absent").length + unpaidLeaveDays + (halfDays * 0.5);
+  const halfDayDeductionDays = rows
+    .filter((row) => row.status === "Half Day")
+    .reduce((total, row) => total + Math.max(0, 0.5 - Math.min(0.5, paidLeaveCoverageForDate(employee.employeeId, row.date, leaveRecords))), 0);
+  const absentDays = rows.filter((row) => row.status === "Absent").length + unpaidLeaveDays + halfDayDeductionDays;
   const fullMonthlySalary = Number(String(employee.monthlySalary || "0").replace(/[^0-9.]/g, "")) || 0;
   const perDay = dates.length ? fullMonthlySalary / dates.length : 0;
   const proratedGrossPay = Math.round(perDay * applicableDates.length);
@@ -1010,6 +1013,22 @@ function approvedLeaveDaysInMonth(employeeId, month, leaveRecords, type) {
       const dates = monthDates(month).filter((date) => request.fromDate <= date && request.toDate >= date);
       if (Number(request.days || 0) > 0 && request.fromDate >= `${month}-01` && request.toDate <= `${month}-31`) return total + Number(request.days || 0);
       return total + dates.length;
+    }, 0);
+}
+
+function paidLeaveCoverageForDate(employeeId, date, leaveRecords) {
+  return leaveRecords
+    .filter((request) => (
+      request.employeeId === employeeId &&
+      request.status === "Approved" &&
+      ["Casual Leave", "Compensatory Off"].includes(request.type) &&
+      request.fromDate <= date &&
+      request.toDate >= date
+    ))
+    .reduce((total, request) => {
+      const coveredDates = monthDates(date.slice(0, 7)).filter((coveredDate) => request.fromDate <= coveredDate && request.toDate >= coveredDate);
+      const perDay = Number(request.days || 0) > 0 && coveredDates.length ? Number(request.days || 0) / coveredDates.length : 1;
+      return total + perDay;
     }, 0);
 }
 

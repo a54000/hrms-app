@@ -115,6 +115,16 @@ function employeeApplicableDates(employee, dates) {
   return dates.filter((date) => date >= joinDate && date <= exitDate);
 }
 
+function paidLeaveCoverageForDate(leaves, date) {
+  return leaves
+    .filter((leave) => paidLeaveTypes.has(leave.leaveType) && toDateString(leave.fromDate) <= date && toDateString(leave.toDate) >= date)
+    .reduce((total, leave) => {
+      const spanDates = monthDates(date.slice(0, 7)).filter((coveredDate) => toDateString(leave.fromDate) <= coveredDate && toDateString(leave.toDate) >= coveredDate);
+      const perDay = Number(leave.days || 0) > 0 && spanDates.length ? Number(leave.days || 0) / spanDates.length : 1;
+      return total + perDay;
+    }, 0);
+}
+
 function csvEscape(value) {
   const text = value === null || value === undefined ? "" : String(value);
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
@@ -238,6 +248,7 @@ async function buildPayrollRows({ month, entity }) {
     let remoteDays = 0;
     let lateDays = 0;
     let halfDays = 0;
+    let halfDayDeductionDays = 0;
     let absentOnlyDays = 0;
     let totalHours = 0;
     const conflicts = [];
@@ -251,7 +262,10 @@ async function buildPayrollRows({ month, entity }) {
         if (["present", "late"].includes(attendance.status)) presentDays += 1;
         if (attendance.status === "remote") remoteDays += 1;
         if (attendance.status === "late") lateDays += 1;
-        if (attendance.status === "half_day") halfDays += 1;
+        if (attendance.status === "half_day") {
+          halfDays += 1;
+          halfDayDeductionDays += Math.max(0, 0.5 - Math.min(0.5, paidLeaveCoverageForDate(employeeLeaves, date)));
+        }
         if (attendance.status === "absent") absentOnlyDays += 1;
         totalHours += durationHours(attendance);
         if (attendance.remarks) attendanceNotes.push(`${date}: ${attendance.remarks}`);
@@ -267,7 +281,7 @@ async function buildPayrollRows({ month, entity }) {
     const compOffDays = leaveTotals["Compensatory Off"] || 0;
     const unpaidLeaveDays = leaveTotals["Unpaid Leave"] || 0;
     const paidLeaveDays = casualLeaveDays + compOffDays;
-    const deductibleDays = Number((absentOnlyDays + unpaidLeaveDays + (halfDays * 0.5)).toFixed(2));
+    const deductibleDays = Number((absentOnlyDays + unpaidLeaveDays + halfDayDeductionDays).toFixed(2));
     const fullMonthlySalary = Number(employee.monthlySalary || 0);
     const perDay = dates.length ? fullMonthlySalary / dates.length : 0;
     const proratedGross = Math.round(perDay * applicableDates.length);
