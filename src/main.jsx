@@ -963,8 +963,9 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
   });
   const presentDays = rows.filter((row) => ["Present", "Remote", "Late"].includes(row.status)).length;
   const halfDays = rows.filter((row) => row.status === "Half Day").length;
-  const paidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Casual Leave") +
-    approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off");
+  const casualLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Casual Leave");
+  const compOffDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Compensatory Off");
+  const paidLeaveDays = casualLeaveDays + compOffDays;
   const unpaidLeaveDays = approvedLeaveDaysInMonth(employee.employeeId, month, leaveRecords, "Unpaid Leave");
   const halfDayDeductionDays = rows
     .filter((row) => row.status === "Half Day")
@@ -986,6 +987,8 @@ function payrollForEmployee(employee, month, attendanceRecords, leaveRecords, pa
     presentDays,
     halfDays,
     paidLeaveDays,
+    casualLeaveDays,
+    compOffDays,
     unpaidLeaveDays,
     absentDays,
     paidDays,
@@ -1113,6 +1116,9 @@ function payrollRowsToCsv(month, rows) {
     ["applicableDays", "Applicable Days"],
     ["presentDays", "Present Days"],
     ["paidLeaveDays", "Paid Leave Days"],
+    ["casualLeaveDays", "Casual Leave Days"],
+    ["compOffDays", "Comp Off Days"],
+    ["unpaidLeaveDays", "Unpaid Leave Days"],
     ["absentDays", "Absent Days"],
     ["fullMonthlySalary", "Full Monthly Salary"],
     ["gross", "Prorated Gross Salary"],
@@ -1137,6 +1143,9 @@ function payrollRowsToCsv(month, rows) {
     applicableDays: row.applicableDays,
     presentDays: row.presentDays,
     paidLeaveDays: row.paidLeaveDays,
+    casualLeaveDays: row.casualLeaveDays,
+    compOffDays: row.compOffDays,
+    unpaidLeaveDays: row.unpaidLeaveDays,
     absentDays: row.absentDays,
     fullMonthlySalary: row.fullMonthlySalary,
     gross: row.monthlySalary,
@@ -6540,6 +6549,8 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
     const typeMatches = typeFilter === "All" || request.type === typeFilter;
     return statusMatches && typeMatches;
   });
+  const employeeLeaveLog = [...scopedRequests]
+    .sort((left, right) => String(right.fromDate || "").localeCompare(String(left.fromDate || "")) || String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
   const requestedDays = requestedLeaveDays(draft);
   const selectedEmployee = scopedEmployees.find((employee) => employee.employeeId === draft.employeeId);
   const selectedBalances = leaveBalanceRows(draft.employeeId, leaveRecords, leaveSettings, selectedEmployee, attendanceRecords);
@@ -6812,6 +6823,22 @@ function Leave({ role, profile, employees, leaveRecords, setLeaveRecords, leaveS
           </div>
         </Panel>
       </div>
+
+      {role === "employee" && (
+        <Panel title="My Leave Log" meta={`${employeeLeaveLog.length} request${employeeLeaveLog.length === 1 ? "" : "s"}`}>
+          <DataTable
+            columns={["Date", "Type", "Days", "Status", "Reason", "Approver"]}
+            rows={employeeLeaveLog.length ? employeeLeaveLog.map((request) => [
+              formatDateRange(request.fromDate, request.toDate),
+              request.type,
+              request.days,
+              <Badge key={`${request.id}-status`} tone={request.status === "Approved" ? "green" : request.status === "Rejected" ? "red" : "amber"}>{request.status}</Badge>,
+              request.reason || "-",
+              request.approver || "-",
+            ]) : [["-", "-", "-", "-", "No leave requests found.", "-"]]}
+          />
+        </Panel>
+      )}
 
       {showApplyForm && (
         <LeaveApplyModal
@@ -7439,6 +7466,9 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
                 <Info label="Work days" value={payslip.applicableDays || payslip.workDays} />
                 <Info label="Paid days" value={payslip.paidDays} />
                 <Info label="Present days" value={payslip.presentDays} />
+                <Info label="Casual leave" value={payslip.casualLeaveDays} />
+                <Info label="Comp off" value={payslip.compOffDays} />
+                <Info label="Unpaid leave" value={payslip.unpaidLeaveDays} />
                 <Info label="Unpaid / absent days" value={payslip.absentDays} />
               </div>
               {payslip.leaveConflicts?.length > 0 && (
@@ -7501,12 +7531,14 @@ function Payroll({ role, profile, employees, leaveRecords, attendanceRecords, pa
         {payrollNotice && <div className="payroll-notice">{payrollNotice}</div>}
         <div className="form-note">Attendance source for payroll: {payrollAttendanceStatus}</div>
 
-        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Paid leave", "Unpaid/Absent", "Prorated gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
+        <DataTable columns={["Employee", "Entity", "Payable period", "Present", "Casual Leave", "Comp Off", "Unpaid Leave", "Unpaid/Absent", "Prorated gross", "Deductions", "Net payable", "Conflicts", "Status", "Salary Slip"]} rows={payrollRows.map((row) => [
           <Person key={`${row.key}-person`} name={row.employee.name} detail={`${row.employee.employeeId} Â· ${row.employee.dept}`} />,
           row.employee.legalEntity || "HRGP",
           `${row.applicableDays || row.workDays}/${row.workDays}`,
           row.presentDays,
-          row.paidLeaveDays,
+          row.casualLeaveDays,
+          row.compOffDays,
+          row.unpaidLeaveDays,
           row.absentDays,
           `INR ${row.monthlySalary.toLocaleString("en-IN")}`,
           `INR ${row.deductions.toLocaleString("en-IN")}`,
