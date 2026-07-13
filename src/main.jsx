@@ -5671,7 +5671,10 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       setRequestDraft(null);
       return;
     }
-    const reasonBase = requestDraft.requestType === "Forgot to punch" ? (requestDraft.reason?.trim() || requestDraft.punchType || "Missed / late punch") : requestDraft.reason.trim();
+    const isForgotPunch = requestDraft.requestType === "Forgot to punch";
+    const isMissedCheckout = isForgotPunch && requestDraft.punchType === "Checkout";
+    const sourceAttendance = attendanceRecords.find((record) => record.employeeId === requestDraft.employeeId && record.date === requestDraft.date);
+    const reasonBase = isForgotPunch ? (requestDraft.reason?.trim() || requestDraft.punchType || "Missed / late punch") : requestDraft.reason.trim();
     const reason = requestDraft.reason === "System issue" && requestDraft.screenshotName ? `${reasonBase} - Screenshot: ${requestDraft.screenshotName}` : reasonBase;
     if (requestDraft.requestType !== "Forgot to punch" && !reason) return;
     if (requestDraft.requestType !== "Working from 2nd Half" && !canOpenAttendanceRequest(requestDraft.employeeId)) {
@@ -5684,12 +5687,20 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       setDuplicateRequestNotice(duplicatePunchMessage(requestDraft.punchType, requestDraft.date));
       return;
     }
-    const normalizedCheckIn = requestDraft.requestType === "Forgot to punch" && requestDraft.punchType === "Checkout" && !requestDraft.checkIn
-      ? (attendanceRecords.find((record) => record.employeeId === requestDraft.employeeId && record.date === requestDraft.date)?.checkIn || "")
+    const normalizedCheckIn = isMissedCheckout
+      ? (requestDraft.checkIn || sourceAttendance?.checkIn || "")
       : requestDraft.checkIn;
     const normalizedCheckOut = requestDraft.requestType === "Forgot to punch" && requestDraft.punchType === "Check in"
       ? ""
       : requestDraft.checkOut;
+    if (isMissedCheckout && !normalizedCheckIn) {
+      setAttendanceError(`Check-in is missing for ${requestDraft.date}. Please contact Admin to regularize the full day.`);
+      return;
+    }
+    if (isMissedCheckout && !normalizedCheckOut) {
+      setAttendanceError("Checkout time is required.");
+      return;
+    }
     const hours = requestDraft.hours || String(hoursBetween(normalizedCheckIn, normalizedCheckOut) || "");
     const request = {
       id: `AR-${Date.now()}`,
