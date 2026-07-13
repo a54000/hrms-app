@@ -5702,10 +5702,11 @@ function Attendance({ role, profile, employees, leaveRecords, setLeaveRecords, a
       return;
     }
     const hours = requestDraft.hours || String(hoursBetween(normalizedCheckIn, normalizedCheckOut) || "");
+    const requestEmployee = employees.find((item) => item.employeeId === requestDraft.employeeId);
     const request = {
       id: `AR-${Date.now()}`,
       employeeId: requestDraft.employeeId,
-      employee: employee?.name || requestDraft.employee,
+      employee: requestEmployee?.name || requestDraft.employee,
       date: requestDraft.date,
       requestType: requestDraft.requestType,
       statusValue: requestDraft.statusValue,
